@@ -1,0 +1,6 @@
+reflex[db]>=0.6.0
+sqlmodel
+psycopg2-binary
+python-dotenv
+httpx
+alembic
