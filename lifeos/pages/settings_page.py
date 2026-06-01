@@ -203,45 +203,36 @@ def notion_section() -> rx.Component:
 
 
 def google_calendar_section() -> rx.Component:
-    """Google Calendar placeholder section."""
+    """Settings for Google Calendar integration."""
     return rx.box(
-        section_header(
-            "Google Calendar",
-            "Display calendar events on the Agenda page (coming soon).",
-        ),
         rx.vstack(
-            rx.box(
-                rx.hstack(
-                    rx.icon("calendar", size=20, color=COLORS["muted"]),
-                    rx.vstack(
-                        rx.text(
-                            "Google Calendar OAuth is coming soon",
-                            font_size="14px",
-                            color=COLORS["text"],
-                            font_weight="500",
-                        ),
-                        rx.text(
-                            "When available, click 'Connect' to authorize LifeOS to read your calendar events.",
-                            font_size="12px",
-                            color=COLORS["muted"],
-                        ),
-                        spacing="1",
-                        align="start",
-                    ),
-                    align="center",
-                    spacing="3",
-                ),
-                padding="16px",
-                background_color=COLORS["surface2"],
-                border=f"1px dashed {COLORS['border']}",
-                border_radius="8px",
+            section_header("Google Calendar", "Sync your external schedule to the Agenda view."),
+            rx.vstack(
+                label_field("Calendar ID (e.g., your@gmail.com)", "google_calendar_id", "google_calendar_id", "Primary Calendar ID"),
+                spacing="4",
+                width="100%",
             ),
-            rx.button(
-                rx.icon("calendar", size=14),
-                "Connect Google Calendar",
-                color_scheme="blue",
-                size="2",
-                disabled=True,
+            spacing="4",
+            width="100%",
+        ),
+        background_color=COLORS["surface"],
+        border=f"1px solid {COLORS['border']}",
+        border_radius="10px",
+        padding="24px",
+        width="100%",
+        margin_bottom="24px",
+    )
+    
+def habitat_section() -> rx.Component:
+    """Settings for the environment and weather tracking."""
+    return rx.box(
+        rx.vstack(
+            section_header("Habitat & Environment", "Configure your Observatory tracking coordinates."),
+            rx.vstack(
+                label_field("Observatory Title", "habitat_name", "habitat_name", "e.g., Monroe Observatory"),
+                label_field("Weather API Location", "habitat_location", "habitat_location", "e.g., Monroe, WA"),
+                spacing="4",
+                width="100%",
             ),
             spacing="4",
             width="100%",
@@ -254,11 +245,11 @@ def google_calendar_section() -> rx.Component:
         margin_bottom="24px",
     )
 
-
 def settings_form() -> rx.Component:
     """Complete settings form."""
     return rx.form(
         rx.vstack(
+            habitat_section(),
             labels_section(),
             skedpal_section(),
             notion_section(),

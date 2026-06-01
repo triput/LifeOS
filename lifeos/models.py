@@ -153,5 +153,9 @@ class Settings(SQLModel, table=True):
     skedpal_webhook_url: str = ""
     notion_access_token: str = ""
     google_calendar_token: str = ""
+    google_calendar_id: str = ""
     # Theme accent
     accent_color: str = "teal"
+    # Habitat
+    habitat_name: str = "Monroe Observatory"
+    habitat_location: str = "Monroe, WA"

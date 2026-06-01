@@ -4,3 +4,8 @@ assets/external/
 __pycache__/
 *.db
 .states
+.env
+reflex.lock/*
+.gitignore
+.git/
+

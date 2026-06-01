@@ -35,6 +35,8 @@ def _seed_database():
             label_specialization="Specialization",
             label_course="Course",
             label_module="Module",
+            habitat_name="Monroe Observatory",
+            habitat_location="Monroe, WA",
         )
         session.add(settings)
 
@@ -167,7 +169,8 @@ class AppState(rx.State):
             if not s:
                 s = Settings()
                 session.add(s)
-
+            s.habitat_name = form_data.get("habitat_name", s.habitat_name)
+            s.habitat_location = form_data.get("habitat_location", s.habitat_location)
             s.label_epic = form_data.get("label_epic", s.label_epic)
             s.label_project = form_data.get("label_project", s.label_project)
             s.label_task = form_data.get("label_task", s.label_task)
@@ -178,6 +181,7 @@ class AppState(rx.State):
             s.skedpal_webhook_url = form_data.get("skedpal_webhook_url", s.skedpal_webhook_url)
             s.notion_access_token = form_data.get("notion_access_token", s.notion_access_token)
             s.google_calendar_token = form_data.get("google_calendar_token", s.google_calendar_token)
+            s.google_calendar_id = form_data.get("google_calendar_id", s.google_calendar_id)
             s.accent_color = form_data.get("accent_color", s.accent_color)
             session.commit()
 

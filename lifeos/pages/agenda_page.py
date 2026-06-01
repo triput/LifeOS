@@ -229,56 +229,67 @@ def due_today_panel() -> rx.Component:
     )
 
 
-def google_calendar_placeholder() -> rx.Component:
-    """Placeholder card for Google Calendar integration."""
+def google_calendar_widget() -> rx.Component:
+    """Displays events pulled from the external calendar engine."""
     return rx.box(
         rx.vstack(
             rx.hstack(
-                rx.icon("calendar", size=20, color=COLORS["muted"]),
+                rx.icon("calendar-clock", size=18, color=COLORS["primary"]),
                 rx.text(
-                    "Google Calendar",
-                    font_size="14px",
-                    font_weight="600",
-                    color=COLORS["text"],
+                    "EXTERNAL SCHEDULE",
+                    font_size="12px",
+                    font_weight="700",
+                    color=COLORS["muted"],
+                    letter_spacing="0.08em",
                 ),
+                rx.spacer(),
+                rx.badge(AgendaState.calendar_status, variant="soft", color_scheme="blue", size="1"),
                 align="center",
-                spacing="2",
+                width="100%",
+                padding_bottom="12px",
+                border_bottom=f"1px solid {COLORS['border']}",
             ),
-            rx.text(
-                "Connect Google Calendar to see your events inline.",
-                font_size="12px",
-                color=COLORS["muted"],
-                text_align="center",
+            
+            # Loop through the agnostic events list
+            rx.cond(
+                AgendaState.external_events.length() > 0,
+                rx.foreach(
+                    AgendaState.external_events,
+                    lambda event: rx.hstack(
+                        rx.box(width="4px", height="24px", background_color=COLORS["primary"], border_radius="2px"),
+                        rx.vstack(
+                            rx.text(event["title"], font_size="13px", color=COLORS["text"], font_weight="600"),
+                            # We can format the raw ISO time string here or in the backend
+                            rx.text(event["time"], font_size="11px", color=COLORS["muted"]),
+                            spacing="0",
+                        ),
+                        rx.spacer(),
+                        rx.badge(event["source"], variant="soft", color_scheme="gray"),
+                        align="center",
+                        width="100%",
+                        padding_top="8px"
+                    )
+                ),
+                rx.text("No external events scheduled today.", font_size="12px", color=COLORS["muted"], padding_top="12px")
             ),
-            rx.button(
-                "Connect Calendar",
-                variant="soft",
-                color_scheme="blue",
-                size="2",
-                disabled=True,
-            ),
-            rx.text(
-                "Coming soon — configure in Settings",
-                font_size="11px",
-                color=COLORS["muted"],
-            ),
-            align="center",
-            spacing="3",
-            padding="20px",
+            
+            spacing="2",
+            width="100%",
+            align="start",
         ),
         background_color=COLORS["surface"],
-        border=f"1px dashed {COLORS['border']}",
+        border=f"1px solid {COLORS['border']}",
         border_radius="10px",
-        min_width="280px",
-        width="320px",
-        margin_top="12px",
+        padding="20px",
+        width="100%",
+        margin_top="16px",
     )
 
 
 @rx.page(
     route="/agenda",
     title="Agenda — LifeOS",
-    on_load=[AppState.load_settings, AgendaState.load_agenda],
+    on_load=[AppState.load_settings, AgendaState.load_agenda, AgendaState.sync_external_calendar],
 )
 def agenda_page() -> rx.Component:
     """Agenda page component."""
@@ -293,7 +304,7 @@ def agenda_page() -> rx.Component:
                 # Right: due today + calendar
                 rx.vstack(
                     due_today_panel(),
-                    google_calendar_placeholder(),
+                    google_calendar_widget(),
                     spacing="4",
                     align="start",
                     flex_shrink="0",

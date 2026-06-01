@@ -7,8 +7,85 @@ from lifeos.state.agenda_state import AgendaState
 from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
 from lifeos.components.badges import status_badge, priority_badge
+from lifeos.state.habitat_state import HabitatState
 
-
+def observatory_hud() -> rx.Component:
+    """The dynamic environment tracking widget."""
+    return rx.box(
+        rx.hstack(
+            # Left Side: Current Weather & Temperature
+            rx.vstack(
+                rx.text(
+                    HabitatState.habitat_name,
+                    font_size="10px",
+                    font_weight="700",
+                    color=COLORS["muted"],
+                    letter_spacing="0.1em",
+                ),
+                rx.hstack(
+                    rx.icon(
+                        # Dynamically swap icon based on day/night
+                        rx.cond(HabitatState.is_day, "sun", "moon"), 
+                        size=32, 
+                        # Dynamic color (Warning/Amber for Sun, Primary/Teal for Moon)
+                        color=rx.cond(HabitatState.is_day, COLORS["warning"], COLORS["primary"])
+                    ),
+                    rx.vstack(
+                        rx.text(
+                            HabitatState.current_temp, 
+                            font_size="28px", 
+                            font_weight="800", 
+                            color=COLORS["text"], 
+                            font_family="'Cabinet Grotesk', sans-serif", 
+                            line_height="1"
+                        ),
+                        rx.text(HabitatState.weather_condition, font_size="12px", color=COLORS["muted"]),
+                        spacing="0",
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+                spacing="2",
+                align="start",
+            ),
+            
+            rx.spacer(),
+            
+            # Right Side: Celestial Tracking
+            rx.hstack(
+                # Sunrise
+                rx.vstack(
+                    rx.icon("sunrise", size=16, color=COLORS["muted"]),
+                    rx.text(HabitatState.sunrise, font_size="12px", color=COLORS["text"], font_weight="600"),
+                    align="center",
+                    spacing="1",
+                ),
+                # Sunset
+                rx.vstack(
+                    rx.icon("sunset", size=16, color=COLORS["muted"]),
+                    rx.text(HabitatState.sunset, font_size="12px", color=COLORS["text"], font_weight="600"),
+                    align="center",
+                    spacing="1",
+                ),
+                # Moon Phase
+                rx.vstack(
+                    rx.icon("moon-star", size=16, color=COLORS["muted"]),
+                    rx.text(HabitatState.moon_phase, font_size="12px", color=COLORS["text"], font_weight="600"),
+                    align="center",
+                    spacing="1",
+                ),
+                spacing="6",
+            ),
+            width="100%",
+            align="center",
+        ),
+        background_color=COLORS["surface"],
+        border=f"1px solid {COLORS['border']}",
+        border_radius="10px",
+        padding="20px",
+        width="100%",
+        margin_bottom="24px",
+    )
 def kpi_card(label: str, value, color: str = COLORS["text"], icon: str = "activity") -> rx.Component:
     """Single KPI metric card."""
     return rx.box(
@@ -284,8 +361,10 @@ def quick_add_section() -> rx.Component:
 @rx.page(
     route="/",
     title="Dashboard — LifeOS",
-    on_load=[AppState.load_settings, WorkState.load_work, AgendaState.load_agenda],
+    on_load=[AppState.load_settings, WorkState.load_work, AgendaState.load_agenda, HabitatState.sync_environment],
 )
+
+
 def dashboard_page() -> rx.Component:
     """Dashboard page component."""
     return page_template(
@@ -313,7 +392,7 @@ def dashboard_page() -> rx.Component:
                 width="100%",
                 margin_bottom="24px",
             ),
-
+            observatory_hud(),
             # KPI cards
             rx.hstack(
                 kpi_card("TOTAL TASKS", WorkState.tasks.length(), COLORS["text"], "list-checks"),
