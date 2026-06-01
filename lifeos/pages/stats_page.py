@@ -97,7 +97,7 @@ def kpi_row() -> rx.Component:
             "TASKS COMPLETED",
             StatsState.completed_tasks,
             color=COLORS["success"],
-            icon="check-circle-2",
+            icon="circle-check",
         ),
         stat_card(
             "IN PROGRESS",
@@ -469,7 +469,7 @@ def overdue_table() -> rx.Component:
             StatsState.overdue_items.length() == 0,
             rx.box(
                 rx.vstack(
-                    rx.icon("check-circle-2", size=28, color=COLORS["success"]),
+                    rx.icon("circle-check", size=28, color=COLORS["success"]),
                     rx.text("No overdue items!", font_size="14px", color=COLORS["muted"]),
                     align="center",
                     spacing="2",

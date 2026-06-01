@@ -1,13 +1,27 @@
-"""Dashboard page — KPIs, recent activity, today's agenda widget."""
+
+# ==============================================================================
+# File: lifeos/pages/dashboard_page.py
+# Description: Main Mission Control dashboard layout and widget assembly
+# Component: Frontend / Page
+# Version: 1.0 (Gold Master)
+# Created: 2026-06-01
+# Last Update: 2026-06-01
+# ==============================================================================
 
 import reflex as rx
 from lifeos.styles import COLORS
 from lifeos.state.work_state import WorkState
 from lifeos.state.agenda_state import AgendaState
 from lifeos.state.base_state import AppState
+from lifeos.state.academy_state import AcademyState
+from lifeos.state.habitat_state import HabitatState
 from lifeos.components.template import page_template
 from lifeos.components.badges import status_badge, priority_badge
 from lifeos.state.habitat_state import HabitatState
+from lifeos.pages.agenda_page import google_calendar_widget
+
+
+
 
 def observatory_hud() -> rx.Component:
     """The dynamic environment tracking widget."""
@@ -86,7 +100,7 @@ def observatory_hud() -> rx.Component:
         width="100%",
         margin_bottom="24px",
     )
-def kpi_card(label: str, value, color: str = COLORS["text"], icon: str = "activity") -> rx.Component:
+def kpi_card(label: str, value, color: str = COLORS["text"], icon: str = "activity", item_type: str = "") -> rx.Component:
     """Single KPI metric card."""
     return rx.box(
         rx.vstack(
@@ -118,7 +132,18 @@ def kpi_card(label: str, value, color: str = COLORS["text"], icon: str = "activi
         padding="20px",
         flex="1",
         min_width="160px",
-    )
+        
+        # --- NEW: Make it interactive ---
+        cursor="pointer",
+        _hover={
+            "border_color": color,
+            "transform": "translateY(-2px)",
+            "box_shadow": f"0 4px 12px rgba(0,0,0,0.15)"
+        },
+        transition="all 0.2s ease",
+        on_click=lambda:WorkState.open_kpi_drawer(item_type), 
+        )
+        
 
 
 def task_row_item(task: dict) -> rx.Component:
@@ -161,30 +186,50 @@ def task_row_item(task: dict) -> rx.Component:
 
 def recent_tasks_list() -> rx.Component:
     """List of recent tasks."""
+
     return rx.box(
-        rx.hstack(
-            rx.text(
-                "Recent Tasks",
-                font_size="16px",
-                font_weight="700",
-                color=COLORS["text"],
-                font_family="'Cabinet Grotesk', sans-serif",
-            ),
-            rx.spacer(),
-            rx.link(
-                rx.button(
-                    "View All",
-                    variant="ghost",
-                    color_scheme="gray",
-                    size="1",
+        # Standardized Recent Tasks Header
+            rx.hstack(
+                rx.icon("list-todo", size=18, color=COLORS["primary"]),
+                rx.text(
+                    "RECENT TASKS",
+                    font_size="12px",
+                    font_weight="700",
+                    color=COLORS["muted"],
+                    letter_spacing="0.08em",
                 ),
-                href="/work",
-                text_decoration="none",
+                rx.spacer(),
+                
+                # Right-aligned controls
+                rx.hstack(
+                    rx.select.root(
+                        rx.select.trigger(width="110px", size="1", variant="ghost"),
+                        rx.select.content(
+                            rx.select.item("Recent", value="recent"),
+                            rx.select.item("Priority", value="priority"),
+                            rx.select.item("Status", value="status"),
+                            rx.select.item("Due Date", value="due_date"),
+                            background_color=COLORS["surface"],
+                        ),
+                        value=WorkState.feed_sort_order,
+                        on_change=WorkState.set_feed_sort_order,
+                    ),
+                    rx.link(
+                        "View All",
+                        href="/work",
+                        font_size="12px",
+                        color=COLORS["accent"],
+                        _hover={"color": COLORS["primary"]},
+                    ),
+                    align="center",
+                    spacing="4",
+                ),
+                align="center",
+                width="100%",
+                padding_bottom="12px",
+                border_bottom=f"1px solid {COLORS['border']}",
             ),
-            align="center",
-            width="100%",
-            margin_bottom="12px",
-        ),
+            
         rx.cond(
             WorkState.tasks.length() == 0,
             rx.box(
@@ -200,16 +245,91 @@ def recent_tasks_list() -> rx.Component:
                 rx.foreach(WorkState.tasks, task_row_item),
                 spacing="0",
                 width="100%",
+                align="start",
             ),
         ),
         background_color=COLORS["surface"],
         border=f"1px solid {COLORS['border']}",
         border_radius="10px",
-        padding="20px",
-        flex="1",
-        min_width="300px",
+        padding="16px",
+        width="100%",
+        margin_bottom="8px"
     )
 
+def academy_feed_widget() -> rx.Component:
+    """Dashboard widget displaying active Academy items."""
+    return rx.box(
+        rx.vstack(
+            # Feed Header with Sorting
+            rx.hstack(
+                rx.icon("graduation-cap", size=18, color=COLORS["primary"]),
+                rx.text(
+                    "ACADEMY QUEUE",
+                    font_size="12px",
+                    font_weight="700",
+                    color=COLORS["muted"],
+                    letter_spacing="0.08em",
+                ),
+                rx.spacer(),
+                
+                # The New Sorting Dropdown (Item 8)
+                rx.select.root(
+                    rx.select.trigger(width="110px", size="1", variant="ghost"),
+                    rx.select.content(
+                        rx.select.item("Recent", value="recent"),
+                        rx.select.item("Priority", value="priority"),
+                        rx.select.item("Status", value="status"),
+                        rx.select.item("Due Date", value="due_date"),
+                        background_color=COLORS["surface"],
+                    ),
+                    value=WorkState.feed_sort_order,
+                    on_change=WorkState.set_feed_sort_order,
+                ),
+                
+                align="center",
+                width="100%",
+                padding_bottom="12px",
+                border_bottom=f"1px solid {COLORS['border']}",
+            ),
+            
+            # The Academy List (Assumes AcademyState has an 'items' or 'courses' list)
+            # Update 'AcademyState.items' to match your actual variable name!
+            rx.cond(
+                AcademyState.learning_tasks.length() > 0,
+                rx.foreach(
+                    AcademyState.learning_tasks,
+                    lambda item: rx.hstack(
+                        rx.checkbox(color_scheme="teal"),
+                        rx.text(item.title, font_size="14px", color=COLORS["text"], font_weight="500"),
+                        rx.spacer(),
+                        rx.badge(item.status, variant="soft", color_scheme="blue"),
+                        rx.icon_button(
+                            rx.icon("pencil", size=14),
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="1",
+                            on_click=lambda: AcademyState.open_drawer(item.id),
+                        ),
+                        align="center",
+                        width="100%",
+                        padding="8px 0",
+                        border_bottom=f"1px solid {COLORS['bg']}",
+                    )
+                ),
+                rx.text("No active training items.", font_size="12px", color=COLORS["muted"], padding_top="12px")
+            ),
+            
+            spacing="2",
+            width="100%",
+            align="start",
+        ),
+        background_color=COLORS["surface"],
+        border=f"1px solid {COLORS['border']}",
+        border_radius="10px",
+        padding="20px",
+        width="100%",
+        margin_top="16px",
+    )
 
 def scheduled_task_mini(task: dict) -> rx.Component:
     """Mini scheduled task entry in the agenda widget."""
@@ -258,97 +378,191 @@ def due_today_mini(task: dict) -> rx.Component:
 
 
 def agenda_widget() -> rx.Component:
-    """Mini today's agenda widget."""
-    return rx.box(
-        rx.hstack(
+    """Dashboard widget for local scheduled tasks."""
+    
+    # THE FIX: Add the missing helper function to render the rows
+    def render_task_row(task):
+        is_done = (task["status"] == "Completed")
+        
+        return rx.hstack(
+            rx.checkbox(
+                checked=is_done,
+                on_change=lambda _: WorkState.fast_complete_item(task["id"], "tasks"),
+                color_scheme="teal",
+                size="3",
+            ),
             rx.text(
-                "Today's Agenda",
-                font_size="16px",
-                font_weight="700",
-                color=COLORS["text"],
-                font_family="'Cabinet Grotesk', sans-serif",
+                task["title"],
+                font_size="14px",
+                color=rx.cond(is_done, COLORS["muted"], COLORS["text"]),
+                text_decoration=rx.cond(is_done, "line-through", "none"),
+                font_weight="500",
             ),
             rx.spacer(),
-            rx.link(
-                rx.button(
-                    "Full View",
-                    variant="ghost",
-                    color_scheme="teal",
-                    size="1",
-                ),
-                href="/agenda",
-                text_decoration="none",
+            rx.icon_button(
+                rx.icon("pencil", size=14),
+                variant="ghost",
+                color_scheme="gray",
+                size="1",
+                on_click=lambda: WorkState.open_drawer("task", task["id"]), 
             ),
             align="center",
             width="100%",
-            margin_bottom="12px",
-        ),
+            padding="8px 0",
+            border_bottom=f"1px solid {COLORS['bg']}", # Uses the background color for a subtle divider
+        )
+
+    return rx.box(
         rx.vstack(
+            # Standardized Agenda Header
+            rx.hstack(
+                rx.icon("calendar", size=18, color=COLORS["primary"]),
+                rx.text(
+                    "TODAY'S AGENDA",
+                    font_size="12px",
+                    font_weight="700",
+                    color=COLORS["muted"],
+                    letter_spacing="0.08em",
+                ),
+                rx.spacer(),
+                rx.link(
+                    "Full View",
+                    href="/agenda",
+                    font_size="12px",
+                    color=COLORS["accent"],
+                    _hover={"color": COLORS["primary"]},
+                ),
+                align="center",
+                width="100%",
+                padding_bottom="12px",
+                border_bottom=f"1px solid {COLORS['border']}",
+            ),
+            
+            # Content
             rx.cond(
-                AgendaState.scheduled_tasks.length() == 0,
-                rx.box(
+                AgendaState.due_today.length() > 0,
+                rx.vstack(
+                    rx.foreach(AgendaState.due_today, lambda task: render_task_row(task)),
+                    width="100%",
+                    spacing="2",
+                    padding_top="8px",
+                ),
+                # Empty State
+                rx.center(
                     rx.vstack(
-                        rx.icon("calendar-check", size=28, color=COLORS["muted"]),
-                        rx.text(
-                            "No tasks scheduled today",
-                            font_size="13px",
-                            color=COLORS["muted"],
-                        ),
+                        rx.icon("calendar-x-2", size=32, color=COLORS["muted"]),
+                        rx.text("No tasks scheduled today", font_size="13px", color=COLORS["muted"]),
                         align="center",
                         spacing="2",
-                        padding="16px",
                     ),
-                ),
-                rx.foreach(AgendaState.scheduled_tasks, scheduled_task_mini),
+                    width="100%",
+                    height="100px", 
+                )
             ),
-            spacing="1",
+            
+            spacing="2",
             width="100%",
-        ),
-        rx.cond(
-            AgendaState.due_today.length() > 0,
-            rx.box(
-                rx.text(
-                    "DUE TODAY",
-                    font_size="11px",
-                    font_weight="600",
-                    color=COLORS["warning"],
-                    letter_spacing="0.05em",
-                    margin_top="12px",
-                    margin_bottom="6px",
-                ),
-                rx.foreach(AgendaState.due_today, due_today_mini),
-                width="100%",
-            ),
-            rx.fragment(),
+            align="start",
         ),
         background_color=COLORS["surface"],
         border=f"1px solid {COLORS['border']}",
         border_radius="10px",
         padding="20px",
-        min_width="300px",
-        flex="1",
+        width="100%",
+        min_height="180px", 
     )
-
-
+    
 def quick_add_section() -> rx.Component:
-    """Quick-add task input."""
+    """Universal Quick-add task input."""
     return rx.box(
         rx.hstack(
+            # 1. The Type Selector
+            rx.select.root(
+                rx.select.trigger(width="120px"),
+                rx.select.content(
+                    rx.select.item("Epic", value="epic"),
+                    rx.select.item("Project", value="project"),
+                    rx.select.item("Task", value="task"),
+                    rx.select.item("Subtask", value="subtask"),
+                    background_color=COLORS["surface"],
+                ),
+                value=WorkState.quick_add_type,
+                on_change=WorkState.set_quick_add_type,
+            ),
+            
+            # 2a. OPTIONAL PARENT: EPIC (Visible if "project" is chosen)
+            rx.cond(
+                WorkState.quick_add_type == "project",
+                rx.select.root(
+                    rx.select.trigger(placeholder="Select Epic (Optional)...", width="180px"),
+                    rx.select.content(
+                        rx.foreach(
+                            WorkState.epics,
+                            lambda epic: rx.select.item(epic.title, value=epic.id.to_string())
+                        ),
+                        background_color=COLORS["surface"],
+                    ),
+                    value=WorkState.quick_add_parent_epic_id,
+                    on_change=WorkState.set_quick_add_parent_epic_id,
+                ),
+                rx.fragment()
+            ),
+
+            # 2b. OPTIONAL PARENT: PROJECT (Visible if "task" is chosen)
+            rx.cond(
+                WorkState.quick_add_type == "task",
+                rx.select.root(
+                    rx.select.trigger(placeholder="Select Project (Optional)...", width="180px"),
+                    rx.select.content(
+                        rx.foreach(
+                            WorkState.projects,
+                            lambda proj: rx.select.item(proj.title, value=proj.id.to_string())
+                        ),
+                        background_color=COLORS["surface"],
+                    ),
+                    value=WorkState.quick_add_parent_project_id,
+                    on_change=WorkState.set_quick_add_parent_project_id,
+                ),
+                rx.fragment()
+            ),
+
+            # 2c. REQUIRED PARENT: TASK (Visible if "subtask" is chosen)
+            rx.cond(
+                WorkState.quick_add_type == "subtask",
+                rx.select.root(
+                    rx.select.trigger(placeholder="Select Task (Required)...", width="180px"),
+                    rx.select.content(
+                        rx.foreach(
+                            WorkState.tasks,
+                            lambda task: rx.select.item(task.title, value=task.id.to_string())
+                        ),
+                        background_color=COLORS["surface"],
+                    ),
+                    value=WorkState.quick_add_parent_id,
+                    on_change=WorkState.set_quick_add_parent_id,
+                ),
+                rx.fragment()
+            ),
+            
+            # 3. The Text Input
             rx.input(
-                placeholder="Quick add epic title...",
+                placeholder="Lightning capture...",
                 value=WorkState.quick_add_title,
                 on_change=WorkState.set_quick_add_title,
+                on_key_down=WorkState.handle_key_down,
                 background_color=COLORS["surface"],
                 border_color=COLORS["border"],
                 color=COLORS["text"],
                 flex="1",
                 _placeholder={"color": COLORS["muted"]},
             ),
+            
+            # 4. The Button
             rx.button(
                 rx.icon("plus", size=16),
-                "Add Epic",
+                "Add",
                 color_scheme="teal",
-                on_click=WorkState.quick_add_epic,
+                on_click=WorkState.quick_add_submit,
             ),
             spacing="3",
             width="100%",
@@ -356,71 +570,162 @@ def quick_add_section() -> rx.Component:
         width="100%",
         margin_bottom="20px",
     )
+    
+    
 
+def kpi_action_drawer() -> rx.Component:
+    """Slide-out drawer for fast-completing items."""
+
+        
+    # Helper to render individual rows with a checkbox
+    def render_action_row(item, item_type: str):
+        # Determine status boolean (Reflex Var)
+        is_done = (item.status == "Completed")
+        
+        return rx.hstack(
+            rx.checkbox(
+                checked=is_done,
+                on_change=lambda _: WorkState.fast_complete_item(item.id, item_type),
+                color_scheme="teal",
+                size="3",
+            ),
+            rx.text(
+                item.title,
+                font_size="14px",
+                
+                # THE FIX: Both of these must use rx.cond, absolutely no "if / else" here!
+                color=rx.cond(is_done, COLORS["muted"], COLORS["text"]),
+                text_decoration=rx.cond(is_done, "line-through", "none"),
+                
+                font_weight="500",
+            ),
+            rx.spacer(),
+            rx.icon_button(
+                rx.icon("pencil", size=14),
+                variant="ghost",
+                color_scheme="gray",
+                size="1",
+                on_click=lambda: WorkState.open_drawer(item_type[:-1], item.id), 
+            ),
+            align="center",
+            width="100%",
+            padding="12px 0",
+            border_bottom=f"1px solid {COLORS['border']}",
+        )
+    return rx.drawer.root(
+        rx.drawer.overlay(background_color="rgba(0,0,0,0.4)"),
+        rx.drawer.portal(
+            rx.drawer.content(
+                rx.vstack(
+                    # Header
+                    rx.hstack(
+                        rx.text(
+                            "FAST ACTION: ",
+                            rx.text(WorkState.kpi_drawer_type.upper(), color=COLORS["primary"], as_="span"),
+                            font_size="18px",
+                            font_weight="700",
+                            color=COLORS["text"],
+                            font_family="'Cabinet Grotesk', sans-serif",
+                        ),
+                        rx.spacer(),
+                        rx.drawer.close(
+                            rx.icon_button(rx.icon("x", size=18), variant="ghost", color_scheme="gray", on_click=WorkState.close_kpi_drawer)
+                        ),
+                        align="center",
+                        width="100%",
+                        padding_bottom="16px",
+                        border_bottom=f"1px solid {COLORS['border']}",
+                    ),
+                    
+                    # Dynamic List Content
+                    rx.box(
+                        rx.match(
+                            WorkState.kpi_drawer_type,
+                            ("epics", rx.foreach(WorkState.epics, lambda x: render_action_row(x, "epics"))),
+                            ("projects", rx.foreach(WorkState.projects, lambda x: render_action_row(x, "projects"))),
+                            ("tasks", rx.foreach(WorkState.tasks, lambda x: render_action_row(x, "tasks"))),
+                            ("subtasks", rx.foreach(WorkState.subtasks, lambda x: render_action_row(x, "subtasks"))),
+                            rx.text("Loading...", color=COLORS["muted"])
+                        ),
+                        width="100%",
+                        overflow_y="auto",
+                        flex="1",
+                        padding_top="8px",
+                    ),
+                    
+                    height="100%",
+                    width="100%",
+                    align="start",
+                ),
+                background_color=COLORS["surface"],
+                padding="24px",
+                width="400px",
+                height="100%",
+            ),
+        ),
+        direction="right",
+        open=WorkState.kpi_drawer_open,
+        on_open_change=WorkState.handle_kpi_drawer_change,
+    )
 
 @rx.page(
     route="/",
     title="Dashboard — LifeOS",
-    on_load=[AppState.load_settings, WorkState.load_work, AgendaState.load_agenda, HabitatState.sync_environment],
+    on_load=[
+        AppState.load_settings, 
+        WorkState.load_work, 
+        AcademyState.load_academy,
+        AgendaState.load_agenda, 
+        HabitatState.sync_environment,
+        AgendaState.sync_external_calendar # <-- Make sure this is here!
+    ],
 )
-
-
 def dashboard_page() -> rx.Component:
     """Dashboard page component."""
     return page_template(
         rx.vstack(
-            # Welcome message
-            rx.hstack(
-                rx.vstack(
-                    rx.text(
-                        "Welcome to LifeOS",
-                        font_size="24px",
-                        font_weight="700",
-                        color=COLORS["text"],
-                        font_family="'Cabinet Grotesk', sans-serif",
-                    ),
-                    rx.text(
-                        "Your personal productivity OS",
-                        font_size="14px",
-                        color=COLORS["muted"],
-                    ),
-                    align="start",
-                    spacing="1",
-                ),
-                rx.spacer(),
-                align="center",
-                width="100%",
-                margin_bottom="24px",
-            ),
             observatory_hud(),
-            # KPI cards
+            kpi_action_drawer(),
+
+            # KPI cards (Item 2: Reordered Hierarchically)
             rx.hstack(
-                kpi_card("TOTAL TASKS", WorkState.tasks.length(), COLORS["text"], "list-checks"),
-                kpi_card("EPICS", WorkState.epics.length(), COLORS["accent"], "zap"),
-                kpi_card("PROJECTS", WorkState.projects.length(), COLORS["warning"], "folder-open"),
-                kpi_card("SUBTASKS", WorkState.subtasks.length(), COLORS["primary"], "git-branch"),
+                kpi_card("EPICS", WorkState.epics.length(), COLORS["accent"], "zap", "epics"),
+                kpi_card("PROJECTS", WorkState.projects.length(), COLORS["warning"], "folder-open", "projects"),
+                kpi_card("TOTAL TASKS", WorkState.tasks.length(), COLORS["text"], "list-checks", "tasks"),
+                kpi_card("SUBTASKS", WorkState.subtasks.length(), COLORS["primary"], "git-branch", "subtasks"),
                 spacing="4",
                 width="100%",
                 flex_wrap="wrap",
                 margin_bottom="24px",
             ),
 
-            # Quick add
             quick_add_section(),
 
-            # Main content: recent tasks + agenda
+            # Main content blocks
+           # Main content blocks
             rx.hstack(
-                recent_tasks_list(),
-                agenda_widget(),
-                spacing="4",
+                # Left Column: The Work & Academy Feed
+                rx.vstack(
+                    recent_tasks_list(),
+                    academy_feed_widget(), 
+                    width="100%",
+                    flex="2", 
+                    height="100%", # Ensure column fills space
+                ),
+                
+                # Right Column: The Agenda & Calendar 
+                rx.vstack(
+                    agenda_widget(),
+                    google_calendar_widget(), 
+                    width="100%",
+                    flex="1", 
+                    height="100%", # Ensure column fills space
+                ),
+                
+                spacing="6",
                 width="100%",
-                align="start",
-                flex_wrap="wrap",
+                align="stretch", # THE FIX: Forces both columns to match heights
             ),
-
-            spacing="0",
-            width="100%",
-            align="start",
         ),
         title="Dashboard",
     )

@@ -12,13 +12,6 @@ from lifeos.pages.settings_page import settings_page
 
 # Create the app with dark theme and custom stylesheet
 app = rx.App(
-    theme=rx.theme(
-        appearance="dark",
-        accent_color="teal",
-        gray_color="slate",
-        radius="medium",
-        scaling="100%",
-    ),
     stylesheets=["lifeos.css"],
     style={
         "background_color": "#0f1117",
@@ -26,3 +19,4 @@ app = rx.App(
         "font_family": "'Satoshi', 'Inter', system-ui, sans-serif",
     },
 )
+

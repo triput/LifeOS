@@ -202,7 +202,7 @@ def due_today_panel() -> rx.Component:
             AgendaState.due_today.length() == 0,
             rx.box(
                 rx.vstack(
-                    rx.icon("check-circle-2", size=28, color=COLORS["success"]),
+                    rx.icon("circle-check", size=28, color=COLORS["success"]),
                     rx.text(
                         "All caught up!",
                         font_size="14px",

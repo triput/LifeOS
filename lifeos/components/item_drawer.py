@@ -122,6 +122,8 @@ def item_drawer() -> rx.Component:
                                                 rx.select.item("Blocked", value="Blocked"),
                                                 rx.select.item("Cancelled", value="Cancelled"),
                                                 background_color=COLORS["surface"],
+                                                z_index="9999",
+                                                
                                             ),
                                             name="status",
                                             default_value=item.get("status", "In Progress"),
@@ -137,6 +139,7 @@ def item_drawer() -> rx.Component:
                                                 rx.select.item("3 — High", value="3"),
                                                 rx.select.item("4 — Critical", value="4"),
                                                 background_color=COLORS["surface"],
+                                                z_index="9999",  # Ensure it appears above other elements
                                             ),
                                             name="priority",
                                             default_value=str(item.get("priority", "2")),
@@ -235,7 +238,8 @@ def item_drawer() -> rx.Component:
                                     "ESTIMATED",
                                     rx.input(
                                         name="estimated_minutes",
-                                        default_value=str(item.get("estimated_minutes", 0)),
+                                        # THE FIX: Native Reflex Var access and string conversion
+                                        default_value=item["estimated_minutes"].to_string(),
                                         placeholder="e.g. 1h 30m",
                                         width="100%",
                                         background_color=COLORS["surface"],
@@ -247,7 +251,8 @@ def item_drawer() -> rx.Component:
                                     "ACTUAL",
                                     rx.input(
                                         name="actual_minutes",
-                                        default_value=str(item.get("actual_minutes", 0)),
+                                        # THE FIX: Native Reflex Var access and string conversion
+                                        default_value=item["actual_minutes"].to_string(),
                                         placeholder="e.g. 45m",
                                         width="100%",
                                         background_color=COLORS["surface"],

@@ -1,4 +1,11 @@
-"""Base app state with settings loading and seed data."""
+# ==============================================================================
+# File: lifeos/state/base_state.py
+# Description: Base app state with settings loading and seed data.
+# Component: State
+# Version: 1.0 (Gold Master)
+# Created: 2026-06-01
+# Last Update: 2026-06-01
+# ==============================================================================
 
 import reflex as rx
 from sqlmodel import select, SQLModel
@@ -122,6 +129,14 @@ class AppState(rx.State):
 
     settings: dict = {}
     _initialized: bool = False
+
+    # --- NEW: Sidebar Toggle State ---
+    sidebar_open: bool = True
+
+    @rx.event
+    def toggle_sidebar(self):
+        """Toggle the sidebar visibility for mobile responsiveness."""
+        self.sidebar_open = not self.sidebar_open
 
     @rx.event
     async def load_settings(self):

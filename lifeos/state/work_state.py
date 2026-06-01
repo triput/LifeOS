@@ -1,4 +1,11 @@
-"""WorkState — manages Epics, Projects, Tasks, and Subtasks."""
+# ==============================================================================
+# File: lifeos/state/work_state.py
+# Description: WorkState — manages Epics, Projects, Tasks, and Subtasks.
+# Component: State
+# Version: 1.0 (Gold Master)
+# Created: 2026-06-01
+# Last Update: 2026-06-01
+# ==============================================================================
 
 from typing import Optional
 import reflex as rx
@@ -28,19 +35,54 @@ class WorkState(AppState):
     # Quick-add form
     quick_add_title: str = ""
     quick_add_type: str = "task"
-    quick_add_parent_id: int = 0
+    quick_add_parent_id: str = ""         # For Subtasks (Requires Task ID)
+    quick_add_parent_epic_id: str = ""    # For Projects (Optional Epic ID)
+    quick_add_parent_project_id: str = "" # For Tasks (Optional Project ID)
 
     # Notification
     toast_message: str = ""
+
+    # --- Feed Sorting State ---
+    feed_sort_order: str = "recent"  # Options: 'recent', 'priority', 'status', 'due_date'
+
+    @rx.event
+    def set_feed_sort_order(self, order: str):
+        """Update the sort order and reload the work lists."""
+        self.feed_sort_order = order
+        yield WorkState.load_work
+    
+    @rx.event
+    async def handle_key_down(self, key: str):
+        """Native Reflex handler for keyboard events."""
+        if key == "Enter":
+            yield WorkState.quick_add_submit
 
     @rx.event
     async def load_work(self):
         """Load all work data from the database."""
         with rx.session() as session:
-            self.epics = models_to_dicts(session.exec(select(Epic)).all())
-            self.projects = models_to_dicts(session.exec(select(Project)).all())
-            self.tasks = models_to_dicts(session.exec(select(Task)).all())
-            self.subtasks = models_to_dicts(session.exec(select(Subtask)).all())
+            tasks_query = select(Task)
+            
+            # Apply the sorting logic
+            if self.feed_sort_order == "priority":
+                tasks_query = tasks_query.order_by(Task.priority)
+            elif self.feed_sort_order == "status":
+                tasks_query = tasks_query.order_by(Task.status)
+            elif self.feed_sort_order == "due_date":
+                # Sort ascending so the most urgent/closest dates appear at the top
+                tasks_query = tasks_query.order_by(Task.due_date) 
+            else:
+                # THE FIX: Use the primary key ID to determine what is most recent!
+                tasks_query = tasks_query.order_by(Task.id.desc())
+                
+# 1. Update the Tasks serialization at the bottom of your sorting block:
+            raw_tasks = session.exec(tasks_query).all()
+            self.tasks = [task.model_dump() for task in raw_tasks]
+            
+            # 2. Update the other lists (if you added them):
+            self.epics = [epic.model_dump() for epic in session.exec(select(Epic)).all()]
+            self.projects = [proj.model_dump() for proj in session.exec(select(Project)).all()]
+            self.subtasks = [sub.model_dump() for sub in session.exec(select(Subtask)).all()]
 
     @rx.event
     async def open_drawer(self, item_type: str, item_id: int):
@@ -248,6 +290,111 @@ class WorkState(AppState):
     async def set_view_mode(self, mode: str):
         self.view_mode = mode
 
+    @rx.event
+    def set_quick_add_parent_id(self, value: str):
+        self.quick_add_parent_id = value
+
+    @rx.event
+    def set_quick_add_parent_epic_id(self, value: str):
+        self.quick_add_parent_epic_id = value
+
+    @rx.event
+    def set_quick_add_parent_project_id(self, value: str):
+        self.quick_add_parent_project_id = value
+        
+    @rx.event
+    def set_quick_add_type(self, value: str):
+        """Update the quick add dropdown selection."""
+        self.quick_add_type = value
+# --- KPI Drawer State ---
+    kpi_drawer_open: bool = False
+    kpi_drawer_type: str = "tasks" # Tracks which list to display
+
+    @rx.event
+    def open_kpi_drawer(self, item_type: str):
+        """Slide open the interactive KPI list."""
+        self.kpi_drawer_type = item_type
+        self.kpi_drawer_open = True
+
+    @rx.event
+    def close_kpi_drawer(self):
+        """Close the KPI list."""
+        self.kpi_drawer_open = False
+
+    @rx.event
+    def handle_kpi_drawer_change(self, is_open: bool):
+        """Explicitly manage the KPI drawer state to prevent UI desync."""
+        self.kpi_drawer_open = is_open
+
+
+    @rx.event
+    async def fast_complete_item(self, item_id: int, item_type: str):
+        """Instantly mark an item as Completed from the KPI drawer."""
+        with rx.session() as session:
+            if item_type == "epics":
+                item = session.get(Epic, item_id)
+            elif item_type == "projects":
+                item = session.get(Project, item_id)
+            elif item_type == "tasks":
+                item = session.get(Task, item_id)
+            elif item_type == "subtasks":
+                item = session.get(Subtask, item_id)
+                
+            if item:
+                # If it's already completed, un-check it. Otherwise, mark it done.
+                if hasattr(item, "status"):
+                    item.status = "In Progress" if item.status == "Completed" else "Completed"
+                session.add(item)
+                session.commit()
+                
+        # Reload the data so the UI updates instantly
+        yield WorkState.load_work
+        
+    @rx.event
+    async def quick_add_submit(self):
+        """Dynamically add an item based on the selected quick-add type."""
+        if not self.quick_add_title.strip():
+            return
+            
+        with rx.session() as session:
+            title = self.quick_add_title.strip()
+            
+            if self.quick_add_type == "epic":
+                item = Epic(title=title, status="In Progress", priority=2, created_at=today_str())
+            
+            elif self.quick_add_type == "project":
+                # Check for optional parent epic
+                if self.quick_add_parent_epic_id and self.quick_add_parent_epic_id != "":
+                    item = Project(title=title, epic_id=int(self.quick_add_parent_epic_id), status="In Progress", priority=2)
+                else:
+                    item = Project(title=title, status="In Progress", priority=2)
+            
+            elif self.quick_add_type == "task":
+                # Check for optional parent project
+                if self.quick_add_parent_project_id and self.quick_add_parent_project_id != "":
+                    item = Task(title=title, project_id=int(self.quick_add_parent_project_id), status="In Progress", priority=2)
+                else:
+                    item = Task(title=title, status="In Progress", priority=2)
+            
+            elif self.quick_add_type == "subtask":
+                # Required parent task
+                if self.quick_add_parent_id and self.quick_add_parent_id != "":
+                    item = Subtask(title=title, task_id=int(self.quick_add_parent_id))
+                else:
+                    print("Habitat Error: Subtasks require a parent task selection.")
+                    return
+                
+            session.add(item)
+            session.commit()
+            
+        # Explicitly clear all inputs and dropdowns so the UI resets
+        self.quick_add_title = ""
+        self.quick_add_parent_id = ""
+        self.quick_add_parent_epic_id = ""
+        self.quick_add_parent_project_id = ""
+        
+        yield WorkState.load_work
+        
     @rx.event
     async def set_quick_add_title(self, value: str):
         self.quick_add_title = value
