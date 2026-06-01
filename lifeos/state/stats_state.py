@@ -4,7 +4,7 @@ import reflex as rx
 from sqlmodel import select
 
 from lifeos.models import Epic, Project, Task, LearningTask, Module, Certification
-from lifeos.state.base import AppState
+from lifeos.state.base_state import AppState
 from lifeos.utils import quarter_start, quarter_end, fmt_mins, today_str
 
 

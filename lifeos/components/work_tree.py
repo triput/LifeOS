@@ -2,7 +2,7 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.work import WorkState
+from lifeos.state.work_state import WorkState
 from lifeos.components.badges import status_badge, priority_badge
 
 

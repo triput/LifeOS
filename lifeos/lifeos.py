@@ -3,12 +3,12 @@
 import reflex as rx
 
 # Import all pages (they register themselves via @rx.page decorator)
-from lifeos.pages.dashboard import dashboard_page
-from lifeos.pages.work import work_page
-from lifeos.pages.academy import academy_page
-from lifeos.pages.agenda import agenda_page
-from lifeos.pages.stats import stats_page
-from lifeos.pages.settings import settings_page
+from lifeos.pages.dashboard_page import dashboard_page
+from lifeos.pages.work_page import work_page
+from lifeos.pages.academy_page import academy_page
+from lifeos.pages.agenda_page import agenda_page
+from lifeos.pages.stats_page import stats_page
+from lifeos.pages.settings_page import settings_page
 
 # Create the app with dark theme and custom stylesheet
 app = rx.App(

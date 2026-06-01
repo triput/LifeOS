@@ -5,7 +5,7 @@ import reflex as rx
 from sqlmodel import select
 
 from lifeos.models import Task
-from lifeos.state.base import AppState
+from lifeos.state.base_state import AppState
 from lifeos.utils import today_str, models_to_dicts
 
 

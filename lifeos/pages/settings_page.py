@@ -2,7 +2,7 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.base import AppState
+from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
 
 

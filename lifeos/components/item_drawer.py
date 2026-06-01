@@ -2,7 +2,7 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.work import WorkState
+from lifeos.state.work_state import WorkState
 from lifeos.utils import fmt_mins
 
 

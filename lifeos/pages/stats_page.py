@@ -2,8 +2,8 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.stats import StatsState
-from lifeos.state.base import AppState
+from lifeos.state.stats_state import StatsState
+from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
 from lifeos.components.badges import status_badge, priority_badge
 

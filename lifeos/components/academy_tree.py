@@ -2,7 +2,7 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.academy import AcademyState
+from lifeos.state.academy_state import AcademyState
 from lifeos.components.badges import status_badge, activity_type_badge
 
 

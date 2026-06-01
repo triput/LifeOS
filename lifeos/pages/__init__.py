@@ -1,10 +1,10 @@
 """Pages package for LifeOS."""
-from .dashboard import dashboard_page
-from .work import work_page
-from .academy import academy_page
-from .agenda import agenda_page
-from .stats import stats_page
-from .settings import settings_page
+from .dashboard_page import dashboard_page
+from .work_page import work_page
+from .academy_page import academy_page
+from .agenda_page import agenda_page
+from .stats_page import stats_page
+from .settings_page import settings_page
 
 __all__ = [
     "dashboard_page",

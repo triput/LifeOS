@@ -4,7 +4,7 @@ import reflex as rx
 from sqlmodel import select
 
 from lifeos.models import Specialization, Course, Module, LearningTask, Certification
-from lifeos.state.base import AppState
+from lifeos.state.base_state import AppState
 from lifeos.utils import model_to_dict, models_to_dicts, parse_mins
 
 

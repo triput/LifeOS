@@ -5,7 +5,7 @@ import reflex as rx
 from sqlmodel import select
 
 from lifeos.models import Epic, Project, Task, Subtask
-from lifeos.state.base import AppState
+from lifeos.state.base_state import AppState
 from lifeos.utils import today_str, model_to_dict, models_to_dicts, parse_mins
 
 

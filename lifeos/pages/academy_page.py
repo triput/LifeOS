@@ -2,8 +2,8 @@
 
 import reflex as rx
 from lifeos.styles import COLORS
-from lifeos.state.academy import AcademyState
-from lifeos.state.base import AppState
+from lifeos.state.academy_state import AcademyState
+from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
 from lifeos.components.academy_tree import academy_tree
 from lifeos.components.academy_drawer import academy_drawer
