@@ -81,7 +81,8 @@ def academy_drawer() -> rx.Component:
                                 "TITLE",
                                 rx.input(
                                     name="title",
-                                    default_value=item.get("title", ""),
+                                    value=AcademyState.drawer_title_str, 
+                                    on_change=AcademyState.set_drawer_title_str,
                                     placeholder="Enter title...",
                                     width="100%",
                                     background_color=COLORS["surface"],
@@ -89,6 +90,24 @@ def academy_drawer() -> rx.Component:
                                     color=COLORS["text"],
                                 ),
                             ),
+                            
+                            # Description
+
+                                drawer_field(
+                                    "DESCRIPTION",
+                                    rx.text_area(
+                                        name="description",
+                                        value=AcademyState.drawer_description_str,
+                                        on_change=AcademyState.set_drawer_description_str,
+                                        placeholder="Description...",
+                                        width="100%",
+                                        rows="3",
+                                        background_color=COLORS["surface"],
+                                        border_color=COLORS["border"],
+                                        color=COLORS["text"],
+                                    ),
+                                ),
+                        
 
                             # Provider (spec/course)
                             rx.cond(
@@ -112,20 +131,27 @@ def academy_drawer() -> rx.Component:
                                 ~is_lt,
                                 drawer_field(
                                     "STATUS",
-                                    rx.select.root(
-                                        rx.select.trigger(width="100%"),
-                                        rx.select.content(
-                                            rx.select.item("In Progress", value="In Progress"),
-                                            rx.select.item("Planned", value="Planned"),
-                                            rx.select.item("Completed", value="Completed"),
-                                            rx.select.item("Active", value="Active"),
-                                            rx.select.item("Expired", value="Expired"),
-                                            background_color=COLORS["surface"],
-                                        ),
-                                        name="status",
-                                        default_value=item.get("status", "Planned"),
-                                        width="100%",
-                                    ),
+                                    rx.radio.root(
+                                                rx.grid(
+                                                    rx.radio.item("Not Started", value="Not Started"),
+                                                    rx.radio.item("To Do", value="To Do"),
+                                                    rx.radio.item("Planned", value="Planned"),
+                                                    rx.radio.item("In Progress", value="In Progress"),
+                                                    rx.radio.item("On Hold", value="On Hold"),
+                                                    rx.radio.item("Blocked", value="Blocked"),
+                                                    rx.radio.item("Completed", value="Completed"),
+                                                    
+                                                    # Force exactly 2 uniform columns 
+                                                    columns="2",
+                                                    spacing="2", 
+                                                    width="100%",
+                                                ),
+                                                # The State bindings stay exactly the same on the Root wrapper
+                                                value=AcademyState.drawer_status_str,
+                                                on_change=AcademyState.set_drawer_status_str,
+                                                size="1",
+                                                color_scheme="teal",
+                                            ),
                                 ),
                             ),
 

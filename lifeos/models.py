@@ -78,6 +78,7 @@ class Specialization(SQLModel, table=True):
     """Top-level learning path / specialization."""
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
+    description: Optional[str] = Field(default="")
     provider: str = ""
     status: str = "In Progress"
     notion_url: str = ""
@@ -89,6 +90,7 @@ class Course(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     specialization_id: Optional[int] = Field(default=None)
     title: str
+    description: Optional[str] = Field(default="")
     provider: str = ""
     status: str = "Planned"
     notion_url: str = ""
@@ -100,6 +102,7 @@ class Module(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     course_id: int
     title: str
+    description: Optional[str] = Field(default="")
     status: str = "Planned"
     notes: str = ""
     notion_url: str = ""
@@ -111,6 +114,7 @@ class LearningTask(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     module_id: int
     title: str
+    description: Optional[str] = Field(default="")
     activity_type: str = "Video"  # Video, Quiz, Reading, Exercise, Project
     is_completed: bool = False
     estimated_minutes: int = 15

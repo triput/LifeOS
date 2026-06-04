@@ -1,8 +1,58 @@
-"""Utility functions for LifeOS."""
+# ==============================================================================
+# File: lifeos/utils.py
+# Description: Shared utility functions for time parsing and data formatting.
+# Component: Shared Utilities
+# Version: 1.0 (Gold Master)
+# Created: 2026-03-24
+# Last Update: 2026-06-01
+# ==============================================================================
 
 import re
 from datetime import date, datetime
 
+
+
+import re
+
+def parse_time_to_minutes(time_str: str) -> int:
+    """Converts strings like '1w 2d 4h 30m' to total minutes."""
+    if not time_str: return 0
+    total = 0
+    pattern = r'(\d+)\s*(mo|w|d|h|m)'
+    matches = re.findall(pattern, str(time_str).lower())
+    
+    for val, unit in matches:
+        v = int(val)
+        if unit == 'mo': total += v * 43200
+        elif unit == 'w': total += v * 10080
+        elif unit == 'd': total += v * 1440
+        elif unit == 'h': total += v * 60
+        elif unit == 'm': total += v
+        
+    # Fallback if they just typed a raw number
+    if not matches and str(time_str).strip().isdigit():
+        return int(str(time_str).strip())
+        
+    return total
+
+def format_minutes_to_time(minutes: int) -> str:
+    """Converts total minutes to '1w 2d 4h 30m' format."""
+    if not minutes or int(minutes) == 0: return ""
+    m = int(minutes)
+    
+    mo, rem = divmod(m, 43200)
+    w, rem = divmod(rem, 10080)
+    d, rem = divmod(rem, 1440)
+    h, rem = divmod(rem, 60)
+    
+    parts = []
+    if mo: parts.append(f"{mo}mo")
+    if w: parts.append(f"{w}w")
+    if d: parts.append(f"{d}d")
+    if h: parts.append(f"{h}h")
+    if rem: parts.append(f"{rem}m")
+    
+    return " ".join(parts)
 
 def fmt_mins(m: int) -> str:
     """Format minutes as human-readable string like '1h 30m' or '45m'."""

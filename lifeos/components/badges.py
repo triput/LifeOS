@@ -29,18 +29,18 @@ def priority_badge(priority) -> rx.Component:
     priority_str = priority.to_string() if hasattr(priority, "to_string") else str(priority)
     label = rx.match(
         priority,
-        (1, "Low"),
-        (2, "Normal"),
-        (3, "High"),
-        (4, "Critical"),
+        (1, "Critical"),
+        (2, "High"),
+        (3, "Normal"),
+        (4, "Low"),
         "Unknown",
     )
     color = rx.match(
         priority,
-        (1, "gray"),
-        (2, "blue"),
-        (3, "amber"),
-        (4, "red"),
+        (1, "red"),
+        (2, "amber"),
+        (3, "blue"),
+        (4, "gray"),
         "gray",
     )
     return rx.badge(

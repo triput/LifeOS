@@ -25,30 +25,30 @@ HEADER_HEIGHT = "60px"
 
 # Status → color scheme mapping (for rx.badge color_scheme)
 STATUS_COLOR = {
+    "Backlog": "gray",
     "In Progress": "teal",
-    "Completed": "green",
+    "Completed": "sage",
     "Blocked": "red",
     "On Hold": "orange",
-    "Cancelled": "gray",
+    "Cancelled": "dimmed_gray",
     "Planned": "blue",
-    "Active": "teal",
-    "Expired": "red",
+    "Expired": "accent_dim",
 }
 
 # Priority → label mapping
 PRIORITY_LABELS = {
-    1: "Low",
-    2: "Normal",
-    3: "High",
-    4: "Critical",
+    1: "Critical",
+    2: "High",
+    3: "Normal",
+    4: "Low",
 }
 
 # Priority → color scheme mapping
 PRIORITY_COLOR = {
-    1: "gray",
-    2: "blue",
-    3: "amber",
-    4: "red",
+    1: "red",
+    2: "amber",
+    3: "blue",
+    4: "gray",
 }
 
 # Global font import (Fontshare CDN)

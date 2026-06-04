@@ -6,7 +6,12 @@ from lifeos.state.work_state import WorkState
 from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
 from lifeos.components.item_drawer import item_drawer
-from lifeos.components.work_tree import work_tree, kanban_board
+from lifeos.components.work_views import work_tree, kanban_board
+from lifeos.components.badges import status_badge, priority_badge
+from lifeos.components.quick_add import universal_quick_add_widget
+
+
+
 
 
 def filter_bar() -> rx.Component:
@@ -117,32 +122,6 @@ def empty_state() -> rx.Component:
     )
 
 
-def quick_add_epic_bar() -> rx.Component:
-    """Quick add Epic inline form."""
-    return rx.hstack(
-        rx.input(
-            placeholder="New epic title (press button to add)...",
-            value=WorkState.quick_add_title,
-            on_change=WorkState.set_quick_add_title,
-            background_color=COLORS["surface"],
-            border_color=COLORS["border"],
-            color=COLORS["text"],
-            flex="1",
-            _placeholder={"color": COLORS["muted"]},
-        ),
-        rx.button(
-            rx.icon("plus", size=14),
-            "Add Epic",
-            color_scheme="teal",
-            size="2",
-            on_click=WorkState.quick_add_epic,
-        ),
-        spacing="2",
-        width="100%",
-        margin_bottom="12px",
-    )
-
-
 @rx.page(
     route="/work",
     title="Work — LifeOS",
@@ -155,7 +134,7 @@ def work_page() -> rx.Component:
             filter_bar(),
 
             # Quick add epic
-            quick_add_epic_bar(),
+            universal_quick_add_widget(),
 
             # Main content: tree or kanban
             rx.cond(

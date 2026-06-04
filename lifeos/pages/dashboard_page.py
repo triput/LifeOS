@@ -19,6 +19,7 @@ from lifeos.components.template import page_template
 from lifeos.components.badges import status_badge, priority_badge
 from lifeos.state.habitat_state import HabitatState
 from lifeos.pages.agenda_page import google_calendar_widget
+from lifeos.components.quick_add import universal_quick_add_widget
 
 
 
@@ -26,6 +27,7 @@ from lifeos.pages.agenda_page import google_calendar_widget
 def observatory_hud() -> rx.Component:
     """The dynamic environment tracking widget."""
     return rx.box(
+
         rx.hstack(
             # Left Side: Current Weather & Temperature
             rx.vstack(
@@ -183,6 +185,60 @@ def task_row_item(task: dict) -> rx.Component:
         border_bottom=f"1px solid {COLORS['border']}",
     )
 
+def feed_filter_menu() -> rx.Component:
+    """Popover menu for multi-select feed filtering."""
+    return rx.popover.root(
+        rx.popover.trigger(
+            rx.icon_button(rx.icon("filter", size=16), variant="ghost", color_scheme="gray", size="1")
+        ),
+        rx.popover.content(
+            rx.vstack(
+                rx.text("STATUS", font_size="11px", font_weight="700", color=COLORS["muted"]),
+                rx.checkbox(
+                    "In Progress", 
+                    checked=~WorkState.hidden_statuses.contains("In Progress"), 
+                    on_change=lambda val: WorkState.toggle_status_filter("In Progress", val)
+                ),
+                rx.checkbox(
+                    "Completed", 
+                    checked=~WorkState.hidden_statuses.contains("Completed"), 
+                    on_change=lambda val: WorkState.toggle_status_filter("Completed", val)
+                ),
+                
+                rx.divider(margin_y="2"),
+                
+                rx.text("PRIORITY", font_size="11px", font_weight="700", color=COLORS["muted"]),
+                rx.checkbox(
+                    "Critical", 
+                    checked=~WorkState.hidden_priorities.contains(1), 
+                    on_change=lambda val: WorkState.toggle_priority_filter(1, val)
+                ),
+                rx.checkbox(
+                    "High", 
+                    checked=~WorkState.hidden_priorities.contains(2), 
+                    on_change=lambda val: WorkState.toggle_priority_filter(2, val)
+                ),
+                rx.checkbox(
+                    "Normal", 
+                    checked=~WorkState.hidden_priorities.contains(3), 
+                    on_change=lambda val: WorkState.toggle_priority_filter(3, val)
+                ),
+                rx.checkbox(
+                    "Low", 
+                    checked=~WorkState.hidden_priorities.contains(4), 
+                    on_change=lambda val: WorkState.toggle_priority_filter(4, val)
+                ),
+                
+                align="start",
+                width="150px",
+                padding="12px",
+            ),
+            align="end",
+            background_color=COLORS["surface"],
+            border=f"1px solid {COLORS['border']}",
+        )
+    )
+
 
 def recent_tasks_list() -> rx.Component:
     """List of recent tasks."""
@@ -202,6 +258,7 @@ def recent_tasks_list() -> rx.Component:
                 
                 # Right-aligned controls
                 rx.hstack(
+                    feed_filter_menu(),
                     rx.select.root(
                         rx.select.trigger(width="110px", size="1", variant="ghost"),
                         rx.select.content(
@@ -295,9 +352,9 @@ def academy_feed_widget() -> rx.Component:
             # The Academy List (Assumes AcademyState has an 'items' or 'courses' list)
             # Update 'AcademyState.items' to match your actual variable name!
             rx.cond(
-                AcademyState.learning_tasks.length() > 0,
+                AcademyState.tasks.length() > 0,
                 rx.foreach(
-                    AcademyState.learning_tasks,
+                    AcademyState.tasks,
                     lambda item: rx.hstack(
                         rx.checkbox(color_scheme="teal"),
                         rx.text(item.title, font_size="14px", color=COLORS["text"], font_weight="500"),
@@ -474,103 +531,6 @@ def agenda_widget() -> rx.Component:
     
 def quick_add_section() -> rx.Component:
     """Universal Quick-add task input."""
-    return rx.box(
-        rx.hstack(
-            # 1. The Type Selector
-            rx.select.root(
-                rx.select.trigger(width="120px"),
-                rx.select.content(
-                    rx.select.item("Epic", value="epic"),
-                    rx.select.item("Project", value="project"),
-                    rx.select.item("Task", value="task"),
-                    rx.select.item("Subtask", value="subtask"),
-                    background_color=COLORS["surface"],
-                ),
-                value=WorkState.quick_add_type,
-                on_change=WorkState.set_quick_add_type,
-            ),
-            
-            # 2a. OPTIONAL PARENT: EPIC (Visible if "project" is chosen)
-            rx.cond(
-                WorkState.quick_add_type == "project",
-                rx.select.root(
-                    rx.select.trigger(placeholder="Select Epic (Optional)...", width="180px"),
-                    rx.select.content(
-                        rx.foreach(
-                            WorkState.epics,
-                            lambda epic: rx.select.item(epic.title, value=epic.id.to_string())
-                        ),
-                        background_color=COLORS["surface"],
-                    ),
-                    value=WorkState.quick_add_parent_epic_id,
-                    on_change=WorkState.set_quick_add_parent_epic_id,
-                ),
-                rx.fragment()
-            ),
-
-            # 2b. OPTIONAL PARENT: PROJECT (Visible if "task" is chosen)
-            rx.cond(
-                WorkState.quick_add_type == "task",
-                rx.select.root(
-                    rx.select.trigger(placeholder="Select Project (Optional)...", width="180px"),
-                    rx.select.content(
-                        rx.foreach(
-                            WorkState.projects,
-                            lambda proj: rx.select.item(proj.title, value=proj.id.to_string())
-                        ),
-                        background_color=COLORS["surface"],
-                    ),
-                    value=WorkState.quick_add_parent_project_id,
-                    on_change=WorkState.set_quick_add_parent_project_id,
-                ),
-                rx.fragment()
-            ),
-
-            # 2c. REQUIRED PARENT: TASK (Visible if "subtask" is chosen)
-            rx.cond(
-                WorkState.quick_add_type == "subtask",
-                rx.select.root(
-                    rx.select.trigger(placeholder="Select Task (Required)...", width="180px"),
-                    rx.select.content(
-                        rx.foreach(
-                            WorkState.tasks,
-                            lambda task: rx.select.item(task.title, value=task.id.to_string())
-                        ),
-                        background_color=COLORS["surface"],
-                    ),
-                    value=WorkState.quick_add_parent_id,
-                    on_change=WorkState.set_quick_add_parent_id,
-                ),
-                rx.fragment()
-            ),
-            
-            # 3. The Text Input
-            rx.input(
-                placeholder="Lightning capture...",
-                value=WorkState.quick_add_title,
-                on_change=WorkState.set_quick_add_title,
-                on_key_down=WorkState.handle_key_down,
-                background_color=COLORS["surface"],
-                border_color=COLORS["border"],
-                color=COLORS["text"],
-                flex="1",
-                _placeholder={"color": COLORS["muted"]},
-            ),
-            
-            # 4. The Button
-            rx.button(
-                rx.icon("plus", size=16),
-                "Add",
-                color_scheme="teal",
-                on_click=WorkState.quick_add_submit,
-            ),
-            spacing="3",
-            width="100%",
-        ),
-        width="100%",
-        margin_bottom="20px",
-    )
-    
     
 
 def kpi_action_drawer() -> rx.Component:
@@ -699,7 +659,7 @@ def dashboard_page() -> rx.Component:
                 margin_bottom="24px",
             ),
 
-            quick_add_section(),
+            universal_quick_add_widget(),  # The new universal quick-add widget at the top of the dashboard,
 
             # Main content blocks
            # Main content blocks

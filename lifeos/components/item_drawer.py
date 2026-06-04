@@ -1,10 +1,98 @@
-"""Slide-out edit drawer component for Work items."""
+# ==============================================================================
+# File: lifeos/components/item_drawer.py
+# Description: Interactive UI component for editing work items and relational data.
+# Component: Frontend Component
+# Version: 1.0 (Gold Master)
+# Created: 2026-03-24
+# Last Update: 2026-06-01
+# =============================================================================
 
 import reflex as rx
 from lifeos.styles import COLORS
 from lifeos.state.work_state import WorkState
 from lifeos.utils import fmt_mins
 
+def relational_children_widget() -> rx.Component:
+    """Reusable widget to display, stage, and commit children items."""
+    
+    def render_child_row(child):
+        is_done = (child["status"] == "Completed")
+        child_type_with_s = child["type"].to(str) + "s"
+        return rx.hstack(
+            rx.checkbox(
+                checked=is_done,
+                on_change=lambda is_checked: WorkState.toggle_drawer_child(is_checked, child["id"].to(int), child["type"].to(str)),
+                color_scheme="teal",
+          
+            ),
+            rx.text(
+                child["title"], 
+                font_size="14px", 
+                color=rx.cond(is_done, COLORS["muted"], COLORS["text"]),
+                text_decoration=rx.cond(is_done, "line-through", "none")
+            ),
+            rx.spacer(),
+            rx.icon_button(
+                rx.icon("pencil", size=14), size="1", variant="ghost",
+                on_click=lambda: WorkState.open_drawer(child["type"].to(str), child["id"].to(int))
+            ),
+            width="100%", align="center", padding="8px 0", border_bottom=f"1px solid {COLORS['border']}"
+        )
+
+    def render_staged_row(title_tuple):
+        # Enumerate gives us a tuple: (index, value)
+        index = title_tuple[0]
+        title = title_tuple[1]
+        return rx.hstack(
+            rx.icon("circle-dashed", size=16, color=COLORS["warning"]),
+            rx.text(title, font_size="14px", color=COLORS["warning"], font_style="italic"),
+            rx.spacer(),
+            rx.icon_button(
+                rx.icon("x", size=14), size="1", variant="ghost", color_scheme="red",
+                on_click=lambda: WorkState.remove_staged_child(index)
+            ),
+            width="100%", align="center", padding="4px 0"
+        )
+
+    return rx.cond(
+        WorkState.drawer_type != "subtask",
+        rx.box(
+            rx.text("CHILDREN CONTEXT", font_size="11px", font_weight="700", color=COLORS["muted"], margin_bottom="8px"),
+            
+            # Active DB Children
+            rx.cond(
+                WorkState.drawer_children.length() > 0,
+                rx.vstack(rx.foreach(WorkState.drawer_children, render_child_row), width="100%", margin_bottom="8px"),
+                rx.text("No Children Linked.", font_size="13px", color=COLORS["muted"], font_style="italic", margin_bottom="8px")
+            ),
+            
+            # Staged (Unsaved) Children
+            rx.cond(
+                WorkState.drawer_staged_children.length() > 0,
+                rx.box(
+                    rx.vstack(rx.foreach(WorkState.drawer_staged_children, render_staged_row), width="100%"),
+                    rx.button("Commit Pending Children", size="2", width="100%", color_scheme="teal", margin_top="8px", on_click=WorkState.commit_staged_children),
+                    background_color=COLORS["bg"], padding="12px", border_radius="8px", margin_bottom="12px", border=f"1px dashed {COLORS['warning']}"
+                ),
+                rx.fragment()
+            ),
+            
+            # Staging Input Area
+            rx.hstack(
+                rx.input(
+                    placeholder="Queue a child item...",
+                    value=WorkState.drawer_new_child_title,
+                    on_change=WorkState.set_drawer_new_child_title,
+                    on_key_down=rx.call_script(f"if(event.key === 'Enter') {{ {WorkState.stage_new_child()} }}"), # JS is safe here!
+                    size="2", flex="1", background_color=COLORS["surface"]
+                ),
+                rx.button(rx.icon("plus", size=16), on_click=WorkState.stage_new_child, size="2", color_scheme="gray", variant="soft"),
+                width="100%"
+            ),
+            margin_bottom="24px", width="100%",
+        ),
+        rx.fragment()
+    )
 
 def field_label(text: str) -> rx.Component:
     return rx.text(
@@ -24,6 +112,111 @@ def drawer_field(label: str, *inputs) -> rx.Component:
         spacing="1",
         width="100%",
         align="start",
+    )
+
+def relational_parent_widget() -> rx.Component:
+    """Reusable widget to display an item's parent with click-to-navigate."""
+    return rx.box(
+        rx.text("PARENT CONTEXT", font_size="11px", font_weight="700", color=COLORS["muted"], margin_bottom="8px"),
+        rx.cond(
+            # Check if the dictionary actually has keys (meaning a parent exists)
+            WorkState.drawer_parent.contains("id"),
+            rx.hstack(
+                rx.icon("corner-left-up", size=16, color=COLORS["primary"]),
+                rx.text(WorkState.drawer_parent["title"], font_size="14px", color=COLORS["text"], font_weight="500"),
+                rx.badge(WorkState.drawer_parent["type"], variant="soft", color_scheme="gray"),
+                rx.spacer(),
+                rx.button(
+                    "Open", 
+                    size="1", 
+                    variant="ghost", 
+                    # Click to instantly jump to the parent's drawer!
+                    on_click=lambda: WorkState.open_drawer(WorkState.drawer_parent["type"], WorkState.drawer_parent["id"].to(int))
+                ),
+                align="center",
+                padding="12px",
+                border=f"1px solid {COLORS['border']}",
+                border_radius="8px",
+                background_color=COLORS["bg"],
+                width="100%",
+            ),
+            # Empty State
+            rx.text("No Parent Linked.", font_size="13px", color=COLORS["muted"], font_style="italic")
+        ),
+        margin_bottom="24px",
+        width="100%",
+    )
+
+def relational_children_widget() -> rx.Component:
+    """Reusable widget to display and add children items."""
+    
+    def render_child_row(child):
+        is_done = (child["status"] == "Completed")
+        
+        # THE FIX 1: Explicitly cast to string so Reflex can safely concatenate in JS
+        child_type_with_s = child["type"].to(str) + "s"
+        
+        return rx.hstack(
+            rx.checkbox(
+                checked=is_done,
+                # THE FIX 2: Safely tucked INSIDE the checkbox parameters
+                on_change=lambda _: WorkState.fast_complete_item(child["id"].to(int), child_type_with_s),
+                color_scheme="teal",
+            ),
+            rx.text(
+                child["title"], 
+                font_size="14px", 
+                color=rx.cond(is_done, COLORS["muted"], COLORS["text"]),
+                text_decoration=rx.cond(is_done, "line-through", "none")
+            ),
+            rx.spacer(),
+            rx.icon_button(
+                rx.icon("pencil", size=14), 
+                size="1", 
+                variant="ghost",
+                on_click=lambda: WorkState.open_drawer(child["type"].to(str), child["id"].to(int))
+            ),
+            width="100%", 
+            align="center", 
+            padding="8px 0", 
+            border_bottom=f"1px solid {COLORS['border']}"
+        )
+
+    return rx.cond(
+        # Hide the entire children block if we are looking at a Subtask
+        WorkState.drawer_type != "subtask",
+        rx.box(
+            rx.text("CHILDREN CONTEXT", font_size="11px", font_weight="700", color=COLORS["muted"], margin_bottom="8px"),
+            
+            # The List of Children
+            rx.cond(
+                WorkState.drawer_children.length() > 0,
+                rx.vstack(
+                    rx.foreach(WorkState.drawer_children, render_child_row),
+                    width="100%", margin_bottom="12px"
+                ),
+                rx.text("No Children Linked.", font_size="13px", color=COLORS["muted"], font_style="italic", margin_bottom="12px")
+            ),
+            
+            # BONUS: The Quick Add Input
+            rx.hstack(
+                rx.input(
+                    placeholder="Quick add child...",
+                    value=WorkState.drawer_new_child_title,
+                    on_change=WorkState.set_drawer_new_child_title,
+                    size="2", flex="1", background_color=COLORS["surface"]
+                ),
+                rx.button(
+                    rx.icon("plus", size=16), 
+                    on_click=WorkState.quick_add_drawer_child,
+                    size="2", color_scheme="teal"
+                ),
+                width="100%"
+            ),
+            margin_bottom="24px",
+            width="100%",
+        ),
+        rx.fragment() # Render nothing if it's a subtask
     )
 
 
@@ -78,7 +271,8 @@ def item_drawer() -> rx.Component:
                                 "TITLE",
                                 rx.input(
                                     name="title",
-                                    default_value=item.get("title", ""),
+                                    value=WorkState.drawer_title_str,
+                                    on_change=WorkState.set_drawer_title_str,
                                     placeholder="Enter title...",
                                     width="100%",
                                     background_color=COLORS["surface"],
@@ -95,7 +289,8 @@ def item_drawer() -> rx.Component:
                                     "DESCRIPTION",
                                     rx.text_area(
                                         name="description",
-                                        default_value=item.get("description", ""),
+                                        value=WorkState.drawer_description_str,
+                                        on_change=WorkState.set_drawer_description_str,
                                         placeholder="Description...",
                                         width="100%",
                                         rows="3",
@@ -104,7 +299,12 @@ def item_drawer() -> rx.Component:
                                         color=COLORS["text"],
                                     ),
                                 ),
+
                             ),
+                            
+                            # --- THE NEW CONTEXT WIDGETS ---
+                            relational_parent_widget(),
+                            relational_children_widget(),
 
                             # Status + Priority row
                             rx.cond(
@@ -115,8 +315,9 @@ def item_drawer() -> rx.Component:
                                         rx.select.root(
                                             rx.select.trigger(width="100%"),
                                             rx.select.content(
-                                                rx.select.item("In Progress", value="In Progress"),
+                                                rx.select.item("Backlog", value="Backlog"),
                                                 rx.select.item("Planned", value="Planned"),
+                                                rx.select.item("In Progress", value="In Progress"),
                                                 rx.select.item("Completed", value="Completed"),
                                                 rx.select.item("On Hold", value="On Hold"),
                                                 rx.select.item("Blocked", value="Blocked"),
@@ -215,12 +416,13 @@ def item_drawer() -> rx.Component:
                                         ),
                                     ),
                                     drawer_field(
-                                        "DURATION (mins)",
+                                        "DURATION",
                                         rx.input(
+                                            value=WorkState.drawer_duration_str,
+                                            on_change=WorkState.set_drawer_duration_str,
+                                            placeholder="e.g. 1w 2d 4h 30m",
                                             name="scheduled_duration",
-                                            type="number",
-                                            default_value=str(item.get("scheduled_duration", "")),
-                                            placeholder="e.g. 60",
+                                                                                                                                   
                                             width="100%",
                                             background_color=COLORS["surface"],
                                             border_color=COLORS["border"],
@@ -237,10 +439,11 @@ def item_drawer() -> rx.Component:
                                 drawer_field(
                                     "ESTIMATED",
                                     rx.input(
+                                        value=WorkState.drawer_estimated_str,
+                                        on_change=WorkState.set_drawer_estimated_str,
+                                        placeholder="e.g. 1w 2d 4h 30m",
                                         name="estimated_minutes",
-                                        # THE FIX: Native Reflex Var access and string conversion
-                                        default_value=item["estimated_minutes"].to_string(),
-                                        placeholder="e.g. 1h 30m",
+                                       
                                         width="100%",
                                         background_color=COLORS["surface"],
                                         border_color=COLORS["border"],
@@ -250,10 +453,11 @@ def item_drawer() -> rx.Component:
                                 drawer_field(
                                     "ACTUAL",
                                     rx.input(
+                                        value=WorkState.drawer_actual_str,
+                                        on_change=WorkState.set_drawer_actual_str,
+                                        placeholder="e.g. 1w 2d 4h 30m",
                                         name="actual_minutes",
-                                        # THE FIX: Native Reflex Var access and string conversion
-                                        default_value=item["actual_minutes"].to_string(),
-                                        placeholder="e.g. 45m",
+                                        
                                         width="100%",
                                         background_color=COLORS["surface"],
                                         border_color=COLORS["border"],
@@ -341,7 +545,7 @@ def item_drawer() -> rx.Component:
                                 variant="soft",
                                 size="2",
                                 type="button",
-                                on_click=WorkState.delete_item,
+                                on_click=WorkState.delete_drawer_item,
                                 flex="0",
                             ),
                             rx.spacer(),

@@ -1,251 +1,256 @@
-"""AcademyState — manages Specializations, Courses, Modules, LearningTasks, Certifications."""
+# ==============================================================================
+# File: lifeos/state/academy_state.py
+# Description: Engine for managing learning tracks, courses, and modules.
+# Component: State Engine
+# Version: 1.0 (Gold Master)
+# ==============================================================================
 
 import reflex as rx
 from sqlmodel import select
 
 from lifeos.models import Specialization, Course, Module, LearningTask, Certification
 from lifeos.state.base_state import AppState
-from lifeos.utils import model_to_dict, models_to_dicts, parse_mins
-
+# THE FIX: Import our universal time parsers!
+from lifeos.utils import format_minutes_to_time, parse_time_to_minutes, models_to_dicts
 
 class AcademyState(AppState):
     """State for the Academy track."""
 
+    # --- UI Lists ---
     specializations: list[dict] = []
     courses: list[dict] = []
     modules: list[dict] = []
-    learning_tasks: list[dict] = []
+    tasks: list[dict] = [] # Maps to the UI's 'AcademyState.tasks' call
     certifications: list[dict] = []
 
+    # --- Drawer State ---
     selected_item: dict = {}
     selected_type: str = "specialization"
     drawer_open: bool = False
 
-    @rx.event
-    async def load_academy(self):
-        """Load all academy data from the database."""
-        with rx.session() as session:
-            self.specializations = models_to_dicts(
-                session.exec(select(Specialization)).all()
-            )
-            self.courses = models_to_dicts(session.exec(select(Course)).all())
-            self.modules = models_to_dicts(
-                session.exec(select(Module).order_by(Module.order_index)).all()
-            )
-            self.learning_tasks = models_to_dicts(
-                session.exec(select(LearningTask)).all()
-            )
-            self.certifications = models_to_dicts(
-                session.exec(select(Certification)).all()
-            )
+    # --- Controlled Drawer Buffers (Matches work_state.py) ---
+    drawer_title_str: str = ""
+    drawer_description_str: str = ""
+    drawer_estimated_str: str = ""
+    drawer_actual_str: str = ""
+    drawer_duration_str: str = ""
+    drawer_status_str: str = "Not Started"
 
     @rx.event
-    async def open_drawer(self, item_type: str, item_id: int):
-        """Open the edit drawer for a specific academy item."""
-        self.selected_type = item_type
+    def set_drawer_title_str(self, val: str): self.drawer_title_str = val
+    @rx.event
+    def set_drawer_description_str(self, val: str): self.drawer_description_str = val
+    @rx.event
+    def set_drawer_estimated_str(self, val: str): self.drawer_estimated_str = val
+    @rx.event
+    def set_drawer_actual_str(self, val: str): self.drawer_actual_str = val
+    @rx.event
+    def set_drawer_duration_str(self, val: str): self.drawer_duration_str = val
+    @rx.event
+    def set_drawer_status_str(self, val: str): self.drawer_status_str = val
+
+
+    @rx.event
+    def load_academy(self):
+        """Loads all academy data and injects rich time formats for the UI."""
         with rx.session() as session:
-            if item_type == "specialization":
-                item = session.get(Specialization, item_id)
-            elif item_type == "course":
-                item = session.get(Course, item_id)
+            raw_specs = session.exec(select(Specialization)).all()
+            raw_courses = session.exec(select(Course)).all()
+            raw_modules = session.exec(select(Module).order_by(Module.order_index)).all()
+            raw_tasks = session.exec(select(LearningTask)).all()
+            raw_certs = session.exec(select(Certification)).all()
+
+            # THE FIX: Helper to inject human-readable time strings into every item
+            def enrich(items):
+                res = []
+                for item in items:
+                    d = item.model_dump()
+                    d["estimated_str"] = format_minutes_to_time(getattr(item, "estimated_minutes", 0))
+                    d["actual_str"] = format_minutes_to_time(getattr(item, "actual_minutes", 0))
+                    res.append(d)
+                return res
+
+            self.specializations = enrich(raw_specs)
+            self.courses = enrich(raw_courses)
+            self.modules = enrich(raw_modules)
+            self.tasks = enrich(raw_tasks) 
+            self.certifications = models_to_dicts(raw_certs)
+
+    @rx.event
+    def open_drawer(self, item_type: str, item_id: int):
+        """Opens the drawer and populates the controlled string buffers."""
+        self.selected_type = item_type
+        
+        with rx.session() as session:
+            model_map = {
+                "specialization": Specialization, 
+                "course": Course, 
+                "module": Module, 
+                "learning_task": LearningTask, 
+                "task": LearningTask,
+                "certification": Certification
+            }
+            model = model_map.get(item_type)
+            
+            if model:
+                item = session.get(model, item_id)
+                if item:
+                    self.selected_item = item.model_dump()
+                    
+                    # THE FIX: Populate strict string buffers so UI doesn't ghost
+                    self.drawer_title_str = getattr(item, "title", "") or ""
+                    self.drawer_description_str = getattr(item, "description", "") or ""
+                    self.drawer_estimated_str = format_minutes_to_time(getattr(item, "estimated_minutes", 0))
+                    self.drawer_actual_str = format_minutes_to_time(getattr(item, "actual_minutes", 0))
+                    self.drawer_duration_str = format_minutes_to_time(getattr(item, "scheduled_duration", 0))
+                    # Force strict string casting so the UI never receives an Enum or object
+                    raw_status = str(getattr(item, "status", "Not Started") or "Not Started")
+                    self.drawer_status_str = raw_status.title()
+        self.drawer_open = True
+
+    @rx.event
+    def open_new_drawer(self, item_type: str, parent_id: int = None):
+        """Prepares the drawer for a brand new item."""
+        self.selected_type = item_type
+        
+        new_item = {"id": 0} # 0 indicates new item to the save logic
+        
+        # THE FIX: Map the incoming parent_id to the correct foreign key
+        if parent_id is not None:
+            if item_type == "course":
+                new_item["specialization_id"] = parent_id
             elif item_type == "module":
-                item = session.get(Module, item_id)
-            elif item_type == "learning_task":
-                item = session.get(LearningTask, item_id)
-            elif item_type == "certification":
-                item = session.get(Certification, item_id)
-            else:
-                item = None
-
-            self.selected_item = model_to_dict(item) if item else {}
-
+                new_item["course_id"] = parent_id
+            elif item_type in ["learning_task", "task"]:
+                new_item["module_id"] = parent_id
+                
+        self.selected_item = new_item
+            
+        # Clear the buffers
+        self.drawer_title_str = ""
+        self.drawer_description_str = ""
+        self.drawer_estimated_str = ""
+        self.drawer_actual_str = ""
+        self.drawer_duration_str = ""
+        self.drawer_status_str = "Not Started"
+        
         self.drawer_open = True
-
+        
     @rx.event
-    async def open_new_drawer(self, item_type: str, parent_id: int = 0):
-        """Open drawer to create a new academy item."""
-        self.selected_type = item_type
-        base = {"id": None, "title": "", "notes": "", "notion_url": ""}
-        if item_type == "specialization":
-            self.selected_item = {**base, "provider": "", "status": "In Progress"}
-        elif item_type == "course":
-            self.selected_item = {
-                **base,
-                "specialization_id": parent_id,
-                "provider": "",
-                "status": "Planned",
-            }
-        elif item_type == "module":
-            self.selected_item = {
-                **base,
-                "course_id": parent_id,
-                "status": "Planned",
-                "order_index": 0,
-            }
-        elif item_type == "learning_task":
-            self.selected_item = {
-                **base,
-                "module_id": parent_id,
-                "activity_type": "Video",
-                "is_completed": False,
-                "estimated_minutes": 15,
-                "actual_minutes": 0,
-            }
-        elif item_type == "certification":
-            self.selected_item = {
-                **base,
-                "issuer": "",
-                "status": "Active",
-                "pdus_required": 0,
-                "pdus_completed": 0,
-                "seus_required": 0,
-                "seus_completed": 0,
-                "issue_date": "",
-                "next_renewal_date": "",
-            }
-
-        self.drawer_open = True
-
-    @rx.event
-    async def close_drawer(self):
-        """Close the edit drawer."""
+    def close_drawer(self):
+        """Closes the edit drawer without saving."""
         self.drawer_open = False
-        self.selected_item = {}
 
     @rx.event
-    async def save_item(self, form_data: dict):
-        """Upsert the selected academy item."""
-        item_id = self.selected_item.get("id")
-        itype = self.selected_type
-
-        # Parse minute fields
-        for field in ["estimated_minutes", "actual_minutes"]:
-            if field in form_data:
-                form_data[field] = parse_mins(str(form_data.get(field, 0)))
-
+    def save_item(self, form_data: dict):
+        """Saves drawer edits, translating human strings back to database integers."""
+        item_id = self.selected_item.get("id", 0)
+        
         with rx.session() as session:
-            if itype == "specialization":
-                if item_id:
-                    item = session.get(Specialization, item_id)
-                else:
-                    item = Specialization(title="")
-                    session.add(item)
+            model_map = {
+                "specialization": Specialization, 
+                "course": Course, 
+                "module": Module, 
+                "learning_task": LearningTask,
+                "task": LearningTask,
+                "certification": Certification
+            }
+            model = model_map.get(self.selected_type)
+            
+            if not model: return
 
-                item.title = form_data.get("title", item.title)
-                item.provider = form_data.get("provider", item.provider)
-                item.status = form_data.get("status", item.status)
-                item.notion_url = form_data.get("notion_url", item.notion_url)
-                item.notes = form_data.get("notes", item.notes)
-
-            elif itype == "course":
-                if item_id:
-                    item = session.get(Course, item_id)
-                else:
-                    item = Course(title="")
-                    session.add(item)
-
-                item.title = form_data.get("title", item.title)
-                item.provider = form_data.get("provider", item.provider)
-                item.status = form_data.get("status", item.status)
-                item.notion_url = form_data.get("notion_url", item.notion_url)
-                item.notes = form_data.get("notes", item.notes)
-                spec_id = form_data.get("specialization_id")
-                if spec_id:
-                    item.specialization_id = int(spec_id)
-
-            elif itype == "module":
-                if item_id:
-                    item = session.get(Module, item_id)
-                else:
-                    course_id = self.selected_item.get("course_id", 0)
-                    item = Module(course_id=course_id, title="")
-                    session.add(item)
-
-                item.title = form_data.get("title", item.title)
-                item.status = form_data.get("status", item.status)
-                item.notion_url = form_data.get("notion_url", item.notion_url)
-                item.notes = form_data.get("notes", item.notes)
-                item.order_index = int(form_data.get("order_index", item.order_index))
-
-            elif itype == "learning_task":
-                if item_id:
-                    item = session.get(LearningTask, item_id)
-                else:
-                    module_id = self.selected_item.get("module_id", 0)
-                    item = LearningTask(module_id=module_id, title="")
-                    session.add(item)
-
-                item.title = form_data.get("title", item.title)
-                item.activity_type = form_data.get("activity_type", item.activity_type)
-                item.is_completed = form_data.get("is_completed", item.is_completed)
-                item.estimated_minutes = form_data.get("estimated_minutes", item.estimated_minutes)
-                item.actual_minutes = form_data.get("actual_minutes", item.actual_minutes)
-                item.notes = form_data.get("notes", item.notes)
-                item.notion_url = form_data.get("notion_url", item.notion_url)
-
-            elif itype == "certification":
-                if item_id:
-                    item = session.get(Certification, item_id)
-                else:
-                    item = Certification(title="")
-                    session.add(item)
-
-                item.title = form_data.get("title", item.title)
-                item.issuer = form_data.get("issuer", item.issuer)
-                item.status = form_data.get("status", item.status)
-                item.issue_date = form_data.get("issue_date") or None
-                item.next_renewal_date = form_data.get("next_renewal_date") or None
-                item.pdus_required = int(form_data.get("pdus_required", item.pdus_required))
-                item.pdus_completed = int(form_data.get("pdus_completed", item.pdus_completed))
-                item.seus_required = int(form_data.get("seus_required", item.seus_required))
-                item.seus_completed = int(form_data.get("seus_completed", item.seus_completed))
-                item.notes = form_data.get("notes", item.notes)
+            if item_id == 0:
+                # Creating a new item
+                item = model()
+                
+                # THE FIX: Apply the parent foreign keys we tucked into selected_item
+                if hasattr(item, "specialization_id") and "specialization_id" in self.selected_item:
+                    item.specialization_id = self.selected_item["specialization_id"]
+                if hasattr(item, "course_id") and "course_id" in self.selected_item:
+                    item.course_id = self.selected_item["course_id"]
+                if hasattr(item, "module_id") and "module_id" in self.selected_item:
+                    item.module_id = self.selected_item["module_id"]
+                
+                    
+                session.add(item)
             else:
-                return
-
-            session.commit()
-
-        self.drawer_open = False
-        yield AcademyState.load_academy
-
-    @rx.event
-    async def delete_item(self):
-        """Delete the currently selected academy item."""
-        item_id = self.selected_item.get("id")
-        itype = self.selected_type
-
-        if not item_id:
-            self.drawer_open = False
-            return
-
-        with rx.session() as session:
-            if itype == "specialization":
-                item = session.get(Specialization, item_id)
-            elif itype == "course":
-                item = session.get(Course, item_id)
-            elif itype == "module":
-                item = session.get(Module, item_id)
-            elif itype == "learning_task":
-                item = session.get(LearningTask, item_id)
-            elif itype == "certification":
-                item = session.get(Certification, item_id)
-            else:
-                item = None
+                item = session.get(model, item_id)
 
             if item:
-                session.delete(item)
+                # 1. Apply the Text Buffers
+                item.title = self.drawer_title_str
+                item.description = self.drawer_description_str
+                
+                # 2. Apply the Time Parsers (Human -> Machine)
+                if hasattr(item, "estimated_minutes"):
+                    item.estimated_minutes = parse_time_to_minutes(self.drawer_estimated_str)
+                if hasattr(item, "actual_minutes"):
+                    item.actual_minutes = parse_time_to_minutes(self.drawer_actual_str)
+                if hasattr(item, "scheduled_duration"):
+                    item.scheduled_duration = parse_time_to_minutes(self.drawer_duration_str)
+                # 1. Apply the Text Buffers (Safely checking schema first)
+                if hasattr(item, "title"):
+                    item.title = self.drawer_title_str
+                if hasattr(item, "description"):
+                    item.description = self.drawer_description_str
+                if hasattr(item, "status"):
+                    item.status = self.drawer_status_str
+
+                # 3. Apply remaining raw form data (status, etc.)
+                for key, value in form_data.items():
+                    # Skip the controlled fields so we don't overwrite our parsed data
+                    if key not in ["title", "description", "estimated_minutes", "actual_minutes", "scheduled_duration"]:
+                        if hasattr(item, key):
+                            setattr(item, key, value)
+
+                session.add(item)
                 session.commit()
 
         self.drawer_open = False
         yield AcademyState.load_academy
 
     @rx.event
-    async def toggle_learning_task(self, task_id: int):
-        """Toggle a learning task's completion status."""
+    def delete_item(self):
+        """Deletes the currently open item directly from the drawer."""
+        item_id = self.selected_item.get("id")
+        
+        if not item_id:
+            self.drawer_open = False
+            return
+
+        with rx.session() as session:
+            model_map = {
+                "specialization": Specialization, 
+                "course": Course, 
+                "module": Module, 
+                "learning_task": LearningTask,
+                "task": LearningTask,
+                "certification": Certification
+            }
+            model = model_map.get(self.selected_type)
+            
+            if model:
+                item = session.get(model, item_id)
+                if item:
+                    session.delete(item)
+                    session.commit()
+
+        self.drawer_open = False
+        yield AcademyState.load_academy
+
+    @rx.event
+    def toggle_learning_task(self, task_id: int):
+        """Explicit boolean payload for toggling a task's completion status."""
         with rx.session() as session:
             lt = session.get(LearningTask, task_id)
             if lt:
                 lt.is_completed = not lt.is_completed
+                
+                # Auto-sync status string if your DB uses it
+                if hasattr(lt, "status"):
+                    lt.status = "Completed" if lt.is_completed else "Not Started"
+                    
+                session.add(lt)
                 session.commit()
 
         yield AcademyState.load_academy

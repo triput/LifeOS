@@ -5,9 +5,10 @@ from lifeos.styles import COLORS
 from lifeos.state.academy_state import AcademyState
 from lifeos.state.base_state import AppState
 from lifeos.components.template import page_template
-from lifeos.components.academy_tree import academy_tree
+from lifeos.components.academy_views import academy_tree
 from lifeos.components.academy_drawer import academy_drawer
 from lifeos.components.badges import status_badge
+from lifeos.components.quick_add import universal_quick_add_widget
 
 
 def cert_progress_bar(completed, required, color: str) -> rx.Component:
@@ -217,32 +218,6 @@ def certifications_panel() -> rx.Component:
     )
 
 
-def academy_header_bar() -> rx.Component:
-    """Academy page controls."""
-    return rx.hstack(
-        rx.button(
-            rx.icon("plus", size=16),
-            "New Specialization",
-            color_scheme="teal",
-            size="2",
-            on_click=AcademyState.open_new_drawer("specialization", 0),
-        ),
-        rx.button(
-            rx.icon("plus", size=16),
-            "New Course",
-            color_scheme="blue",
-            size="2",
-            variant="soft",
-            on_click=AcademyState.open_new_drawer("course", 0),
-        ),
-        rx.spacer(),
-        align="center",
-        spacing="3",
-        width="100%",
-        margin_bottom="16px",
-    )
-
-
 @rx.page(
     route="/academy",
     title="Academy — LifeOS",
@@ -252,7 +227,8 @@ def academy_page() -> rx.Component:
     """Academy page component."""
     return page_template(
         rx.vstack(
-            academy_header_bar(),
+            universal_quick_add_widget(domain="academy"),  # The new universal quick-add widget at the top of the academy page
+            
             rx.hstack(
                 # Left: Academy tree
                 rx.box(
