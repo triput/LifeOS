@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Unified Domain Context HUD -->
+    <section>
+        {% include 'analytics_card.html' %}
+    </section>
+
+    <!-- Active Actionable Backlog -->
+    <section>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold tracking-wide text-white">Active Focus Backlog</h2>
+            <span class="text-sm text-gray-400">Interchangeable Work & Academy items</span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for task in tasks %}
+                {% include 'task_widget.html' with task=task %}
+            {% empty %}
+                <div class="col-span-full bg-gray-800/40 border border-gray-700/40 rounded-xl p-8 text-center text-gray-500">
+                    <svg class="mx-auto h-12 w-12 text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <p class="font-medium text-gray-400">All tasks completed!</p>
+                    <p class="text-xs text-gray-500 mt-1">Add items or update scopes in Django Admin to begin focus sessions.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>{% endblock %}

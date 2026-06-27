@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeOS Core</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    
+    <style>
+        /* Optional custom scrollbar to keep it clean */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full text-gray-100">
+
+    <div class="min-h-full">
+        <nav class="bg-gray-800 border-b border-gray-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <h1 class="text-xl font-bold text-emerald-400 tracking-wider">LifeOS</h1>
+                        </div>
+                        {% if user.is_authenticated %}
+                        <div class="hidden md:block">
+                            <div class="ml-10 flex items-baseline space-x-4">
+                                <a href="{% url 'dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors">Dashboard</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if user.is_authenticated %}
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-400">Owner: <span class="text-emerald-400 font-semibold">{{ user.username }}</span></span>
+                        <a href="{% url 'logout' %}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors">Logout</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <main>
+            <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+                {% block content %}
+                {% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Helper to get CSRF token from meta tag for AJAX/Fetch
+        function getCsrfToken() {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            return csrfMeta ? csrfMeta.getAttribute('content') : '';
+        }
+
+        const activeIntervals = {};
+
+        // Helper to format seconds to HH:MM:SS
+        function formatTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return [
+                hours.toString().padStart(2, '0'),
+                minutes.toString().padStart(2, '0'),
+                seconds.toString().padStart(2, '0')
+            ].join(':');
+        }
+
+        // Initialize all widget timers on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".task-widget").forEach(widget => {
+                const taskId = widget.dataset.taskId;
+                const timeSpent = parseInt(widget.dataset.timeSpent) || 0;
+                const isActive = widget.dataset.isActive === 'true';
+                const startedAtStr = widget.dataset.startedAt;
+                
+                const display = document.getElementById(`timer-display-${taskId}`);
+                const btn = document.getElementById(`action-btn-${taskId}`);
+
+                if (display && btn) {
+                    if (isActive && startedAtStr) {
+                        btn.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md bg-red-500 hover:bg-red-400 text-white focus:ring-red-400 focus:outline-none";
+                        btn.innerHTML = `<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg><span>Stop</span>`;
+                        
+                        const startedAt = new Date(startedAtStr);
+                        const updateTicker = () => {
+                            const elapsed = Math.floor((new Date() - startedAt) / 1000);
+                            display.innerText = formatTime(timeSpent + elapsed);
+                        };
+                        
+                        updateTicker();
+                        activeIntervals[taskId] = setInterval(updateTicker, 1000);
+                    } else {
+                        btn.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md bg-emerald-400 hover:bg-emerald-300 text-gray-900 focus:ring-emerald-400 focus:outline-none";
+                        btn.innerHTML = `<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg><span>Start</span>`;
+                        display.innerText = formatTime(timeSpent);
+                    }
+                }
+            });
+        });
+
+        // Handle Start/Stop API actions
+        function toggleFocusTimer(taskId) {
+            const widget = document.getElementById(`task-widget-${taskId}`);
+            const isActive = widget.dataset.isActive === 'true';
+            const action = isActive ? 'stop' : 'start';
+
+            fetch('/api/task-action/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    task_id: taskId,
+                    action: action
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Action failed");
+                }
+                return response.json();
+            })
+            .then(data => {
+                window.location.reload();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error updating focus session. Please try again.");
+            });
+        }
+    </script>
+</body>
+</html>

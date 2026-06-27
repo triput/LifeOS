@@ -1,0 +1,43 @@
+<div id="task-widget-{{ task.id }}" 
+     class="task-widget bg-gray-800/80 border border-gray-700/60 rounded-xl p-5 shadow-lg flex flex-col justify-between h-48 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-emerald-950/10 hover:bg-gray-800"
+     data-task-id="{{ task.id }}"
+     data-time-spent="{{ task.time_spent_seconds }}"
+     data-is-active="{% if task.is_active %}true{% else %}false{% endif %}"
+     data-started-at="{% if task.started_at %}{{ task.started_at.isoformat }}{% endif %}">
+    
+    <!-- Widget Header -->
+    <div class="flex items-start justify-between">
+        <div class="space-y-1">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xxs font-medium bg-gray-700 text-gray-300 capitalize">
+                {{ task.item_type }}
+            </span>
+            {% if task.domain_category %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xxs font-medium bg-emerald-950/30 text-emerald-400 border border-emerald-500/10 capitalize ml-1">
+                {{ task.domain_category }}
+            </span>
+            {% endif %}
+            <h4 class="text-md font-bold text-white leading-tight mt-1 line-clamp-2">{{ task.title }}</h4>
+        </div>
+        <a href="{% url 'toggle_task' task.id %}" 
+           title="Mark Complete"
+           class="flex-shrink-0 text-gray-500 hover:text-emerald-400 p-1 rounded-full hover:bg-gray-700/40 transition-colors">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </a>
+    </div>
+
+    <!-- Widget Footer / Controls -->
+    <div class="flex items-end justify-between mt-4 pt-3 border-t border-gray-700/40">
+        <div class="flex flex-col">
+            <span class="text-xxs text-gray-400 uppercase tracking-wider font-semibold">Focus Timer</span>
+            <span id="timer-display-{{ task.id }}" class="font-mono text-2xl text-emerald-400 font-bold tracking-tight">00:00:00</span>
+        </div>
+        
+        <button id="action-btn-{{ task.id }}" 
+                onclick="toggleFocusTimer({{ task.id }})"
+                class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900">
+            <!-- Icon and Label injected dynamically by JavaScript -->
+        </button>
+    </div>
+</div>
