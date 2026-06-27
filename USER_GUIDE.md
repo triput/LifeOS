@@ -20,7 +20,7 @@ Since LifeOS Django is designed as a single-user local system, you run the servi
 ### Steps to Run
 1. Open a terminal (PowerShell or Command Prompt) and navigate to the project directory:
    ```powershell
-   cd "F:\Code Repo\LifeOS_Django"
+   cd "path/to/LifeOS_Django"
    ```
 2. Activate the python virtual environment:
    ```powershell
