@@ -32,8 +32,6 @@ The application utilizes server-rendered Django templates, HTMX for partial-page
 ## Directory Index
 
 *   [USER_GUIDE.md](USER_GUIDE.md) - Operations guide detailing server startup, data structures, and focus sessions.
-*   [LifeOS-SRS.md](docs/LifeOS-SRS.md) - Version 1.0 Software Requirements Specification.
-*   [LifeOS-SRS-v2.md](docs/LifeOS-SRS-v2.md) - Version 2.0 Specifications (Inbox, Quick Entry, Workspace Explorer, Analytics Charts).
 *   [validate_sandbox.py](validate_sandbox.py) - Environment verification script check.
 
 ---
