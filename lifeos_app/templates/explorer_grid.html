@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header Block -->
+    <div class="flex items-center justify-between border-b border-gray-800 pb-4">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-100 tracking-tight flex items-center space-x-3">
+                <span class="p-2 bg-[#9966CC]/15 text-[#9966CC] rounded-lg border border-[#9966CC]/20">
+                    <!-- Spreadsheet icon -->
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </span>
+                <span>Hierarchical Backlog Grid Editor</span>
+            </h2>
+            <p class="text-sm text-gray-400 mt-1.5">A spreadsheet view of your entire backlog hierarchy. Expand categories, edit fields inline, and add tasks instantly.</p>
+        </div>
+        <div>
+            <a href="{% url 'explorer' %}" class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 rounded-lg text-sm font-semibold border border-gray-800 transition-colors flex items-center space-x-2">
+                <span>📂</span> <span>Standard Explorer</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Tree Grid Table -->
+    <div class="bg-[#0D111D]/80 border border-gray-800/80 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
+        <!-- Table Header -->
+        <div class="flex items-center space-x-3 p-4 bg-gray-950/60 border-b border-gray-800/80 text-[11px] font-bold text-gray-400 uppercase tracking-wider select-none">
+            <div class="flex-1 min-w-[180px]">Hierarchy Node (Title)</div>
+            <div class="w-[6%]">Type</div>
+            <div class="w-[9%]">Status</div>
+            <div class="w-[8%]">Priority</div>
+            <div class="w-[8%]">Urgency</div>
+            <div class="w-[10%]">Domain</div>
+            <div class="w-[10%]">Tags</div>
+            <div class="w-[14%]">Dates</div>
+            <div class="w-[6%] text-right">Actions</div>
+        </div>
+
+
+        <!-- Grid Body -->
+        <div class="divide-y divide-gray-850/65" id="grid-tbody">
+            
+            <!-- Root Level Containers -->
+            <div class="bg-gray-900/10 p-3 text-[10px] uppercase font-bold text-gray-500 tracking-widest flex items-center space-x-2">
+                <span>📂</span> <span>Root Containers</span>
+            </div>
+            
+            {% for child in root_containers %}
+                {% include 'partials/grid_row.html' with child=child is_container=True depth=0 %}
+            {% empty %}
+                <div class="p-4 text-center text-xs text-gray-600 italic">No root containers created yet.</div>
+            {% endfor %}
+            
+            <!-- Root Level Orphans (Inbox / Uncategorized Tasks) -->
+            <div class="bg-gray-900/10 p-3 text-[10px] uppercase font-bold text-gray-500 tracking-widest flex items-center space-x-2 border-t border-gray-850/65">
+                <span>📥</span> <span>Unsorted Backlog & Brain Dumps</span>
+            </div>
+            
+            <div id="root-orphans-container" class="divide-y divide-gray-850/45">
+                {% for item in orphan_items %}
+                    {% include 'partials/grid_row.html' with item=item is_container=False depth=0 %}
+                {% empty %}
+                    <div class="p-4 text-center text-xs text-gray-600 italic">All tasks categorized!</div>
+                {% endfor %}
+            </div>
+            
+            <!-- Inline Quick Root Creators -->
+            <div class="p-4 bg-gray-950/20 flex items-center justify-between border-t border-gray-800">
+                <div class="flex items-center space-x-3">
+                    <button type="button" 
+                            hx-post="{% url 'explorer-grid-add-row' %}"
+                            hx-vals='{"parent_type": "root", "row_type": "WorkspaceContainer", "depth": "0"}'
+                            hx-target="#grid-tbody"
+                            hx-swap="beforeend"
+                            class="px-4 py-2 bg-[#0F52BA]/15 hover:bg-[#0F52BA]/25 border border-[#0F52BA]/30 text-[#0F52BA] text-xs font-bold rounded-lg transition-all flex items-center space-x-2">
+                        <span>+</span> <span>New Root Container</span>
+                    </button>
+                    
+                    <button type="button"
+                            hx-post="{% url 'explorer-grid-add-row' %}"
+                            hx-vals='{"parent_type": "root", "row_type": "Task", "depth": "0"}'
+                            hx-target="#root-orphans-container"
+                            hx-swap="beforeend"
+                            class="px-4 py-2 bg-[#9966CC]/15 hover:bg-[#9966CC]/25 border border-[#9966CC]/30 text-[#9966CC] text-xs font-bold rounded-lg transition-all flex items-center space-x-2">
+                        <span>+</span> <span>New Root Task</span>
+                    </button>
+                </div>
+                <div class="text-[10px] text-gray-500 font-semibold italic flex items-center space-x-1.5">
+                    <span class="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span>All changes auto-save instantly.</span>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<script>
+    // Client-side folding/unfolding tree logic
+    function toggleGridNode(nodeType, nodeId) {
+        const rowId = `grid-row-${nodeType}-${nodeId}`;
+        const childrenContainerId = `grid-children-${nodeType}-${nodeId}`;
+        const childrenDiv = document.getElementById(childrenContainerId);
+        const folderIcon = document.getElementById(`grid-icon-${nodeType}-${nodeId}`);
+        
+        if (childrenDiv) {
+            childrenDiv.classList.toggle('hidden');
+            
+            // Toggle folder icon SVG
+            if (childrenDiv.classList.contains('hidden')) {
+                // Closed state
+                folderIcon.innerHTML = `<svg class="h-4 w-4 text-[#0F52BA]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
+            } else {
+                // Open state
+                folderIcon.innerHTML = `<svg class="h-4 w-4 text-[#0F52BA] transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
+            }
+        }
+    }
+
+    // Auto-flash field highlight on HTMX save success
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful && (evt.detail.elt.tagName === 'INPUT' || evt.detail.elt.tagName === 'SELECT')) {
+            const input = evt.detail.elt;
+            input.classList.add('border-green-500/70', 'bg-green-500/10');
+            setTimeout(() => {
+                input.classList.remove('border-green-500/70', 'bg-green-500/10');
+            }, 800);
+        }
+    });
+
+    // Tag dropdown logic
+    function toggleTagDropdown(nodeId) {
+        // Close all other tag dropdowns first
+        document.querySelectorAll("[id^='tag-dropdown-panel-']").forEach(panel => {
+            if (panel.id !== `tag-dropdown-panel-${nodeId}`) {
+                panel.classList.add('hidden');
+            }
+        });
+        const panel = document.getElementById(`tag-dropdown-panel-${nodeId}`);
+        if (panel) {
+            panel.classList.toggle('hidden');
+        }
+    }
+
+    // Close tag dropdowns when clicking outside
+    window.addEventListener('click', function(e) {
+        if (!e.target.closest("[id^='tag-dropdown-wrapper-']")) {
+            document.querySelectorAll("[id^='tag-dropdown-panel-']").forEach(panel => {
+                panel.classList.add('hidden');
+            });
+        }
+    });
+</script>
+{% endblock %}

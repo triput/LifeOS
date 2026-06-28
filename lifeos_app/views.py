@@ -1336,3 +1336,317 @@ def planner_toggle_blocking_view(request, event_id):
     generate_schedule_for_date(event.start_time.date())
     
     return redirect('planner')
+
+
+# ==============================================================================
+# V5.1 Hierarchical Backlog Grid Editor views
+# ==============================================================================
+
+@login_required
+def explorer_grid_view(request):
+    """
+    Renders the spreadsheet-style grid editor for the backlog tree.
+    """
+    root_containers = WorkspaceContainer.objects.filter(
+        parent=None,
+        is_archived=False
+    ).order_by('container_type', 'title')
+    
+    orphan_items = ExecutionItem.objects.filter(
+        content_type=None,
+        is_deleted=False,
+        is_archived=False
+    ).order_by('status', '-created_at')
+    
+    all_domains = DomainCategory.objects.all().order_by('name')
+    all_tags = Tag.objects.all().order_by('name')
+    
+    # Pre-fetch all containers for parent selectors
+    all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+    
+    context = {
+        'root_containers': root_containers,
+        'orphan_items': orphan_items,
+        'all_domains': all_domains,
+        'all_tags': all_tags,
+        'all_containers': all_containers,
+    }
+    return render(request, 'explorer_grid.html', context)
+
+
+@login_required
+def explorer_grid_children_view(request):
+    """
+    Lazy-loads children in the grid layout.
+    """
+    parent_type = request.GET.get('parent_type')
+    parent_id = request.GET.get('parent_id')
+    
+    # Receive depth to propagate to children
+    depth = int(request.GET.get('depth', '0'))
+    child_depth = depth + 1
+    
+    all_domains = DomainCategory.objects.all().order_by('name')
+    all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+    
+    if parent_type == 'container':
+        parent_container = get_object_or_404(WorkspaceContainer, id=parent_id)
+        
+        child_containers = WorkspaceContainer.objects.filter(
+            parent=parent_container,
+            is_archived=False
+        ).order_by('order', 'title')
+        
+        container_ct = ContentType.objects.get_for_model(WorkspaceContainer)
+        child_items = ExecutionItem.objects.filter(
+            content_type=container_ct,
+            object_id=parent_container.id,
+            is_deleted=False,
+            is_archived=False
+        ).order_by('status', 'created_at')
+        
+        return render(request, 'partials/grid_nodes.html', {
+            'child_containers': child_containers,
+            'child_items': child_items,
+            'parent_container': parent_container,
+            'all_domains': all_domains,
+            'all_containers': all_containers,
+            'all_tags': Tag.objects.all().order_by('name'),
+            'depth': child_depth,
+        })
+        
+    elif parent_type == 'task':
+        parent_task = get_object_or_404(ExecutionItem, id=parent_id)
+        task_ct = ContentType.objects.get_for_model(ExecutionItem)
+        
+        child_items = ExecutionItem.objects.filter(
+            content_type=task_ct,
+            object_id=parent_task.id,
+            is_deleted=False,
+            is_archived=False
+        ).order_by('status', 'created_at')
+        
+        return render(request, 'partials/grid_nodes.html', {
+            'child_items': child_items,
+            'parent_task': parent_task,
+            'all_domains': all_domains,
+            'all_containers': all_containers,
+            'all_tags': Tag.objects.all().order_by('name'),
+            'depth': child_depth,
+        })
+        
+    return HttpResponse("Invalid query", status=400)
+
+
+@login_required
+@require_POST
+def explorer_grid_save_field_view(request):
+    """
+    Handles auto-saving updates from individual inline inputs in the grid.
+    """
+    model_type = request.POST.get('model_type') # 'container' or 'item'
+    model_id = request.POST.get('model_id')
+    field = request.POST.get('field')
+    value = request.POST.get('value', '').strip()
+    
+    if not model_type or not model_id or not field:
+        return HttpResponse("Missing fields", status=400)
+        
+    if model_type == 'container':
+        obj = get_object_or_404(WorkspaceContainer, id=model_id)
+    elif model_type == 'item':
+        obj = get_object_or_404(ExecutionItem, id=model_id)
+    else:
+        return HttpResponse("Invalid model type", status=400)
+        
+    try:
+        if field == 'title':
+            if not value:
+                return HttpResponse("Title cannot be empty", status=400)
+            obj.title = value
+        elif field == 'container_type':
+            obj.container_type = value
+        elif field == 'item_type':
+            obj.item_type = value
+        elif field == 'status':
+            obj.status = value
+        elif field == 'priority':
+            obj.priority = value
+        elif field == 'urgency':
+            obj.urgency = value
+        elif field == 'domain':
+            if value == '' or value == 'None':
+                obj.domain = None
+            else:
+                obj.domain = get_object_or_404(DomainCategory, id=value)
+        elif field == 'start_date':
+            obj.start_date = value if value else None
+        elif field == 'due_date':
+            obj.due_date = value if value else None
+        elif field == 'tags':
+            tag_ids = request.POST.getlist('value')
+            tag_ids = [tid for tid in tag_ids if tid.strip() and tid != 'None' and tid != '']
+            if not tag_ids:
+                obj.tags.clear()
+            else:
+                obj.tags.set(Tag.objects.filter(id__in=tag_ids))
+        else:
+            return HttpResponse(f"Unsupported field: {field}", status=400)
+            
+        obj.save()
+        
+        if field == 'tags':
+            all_domains = DomainCategory.objects.all().order_by('name')
+            all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+            all_tags = Tag.objects.all().order_by('name')
+            
+            # depth needs to be passed back
+            depth = int(request.POST.get('depth', '0'))
+            
+            context = {
+                'all_domains': all_domains,
+                'all_containers': all_containers,
+                'all_tags': all_tags,
+                'depth': depth,
+                'open_tag_dropdown': True,
+            }
+            if model_type == 'container':
+                context['child'] = obj
+                context['is_container'] = True
+            else:
+                context['item'] = obj
+                context['is_container'] = False
+                
+            return render(request, 'partials/grid_row.html', context)
+            
+        return HttpResponse(status=200)
+    except Exception as e:
+        return HttpResponse(f"Save failed: {str(e)}", status=500)
+
+
+@login_required
+@require_POST
+def explorer_grid_add_row_view(request):
+    """
+    Creates a new placeholder record in the DB and returns its grid row HTML.
+    """
+    parent_type = request.POST.get('parent_type', 'root') # 'container', 'task', or 'root'
+    parent_id = request.POST.get('parent_id')
+    row_type = request.POST.get('row_type', 'Task') # 'Task', 'WorkspaceContainer'
+    
+    # Indentation/depth level
+    depth = int(request.POST.get('depth', '0'))
+    child_depth = depth + 1
+    
+    all_domains = DomainCategory.objects.all().order_by('name')
+    all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+    
+    if row_type == 'WorkspaceContainer':
+        container = WorkspaceContainer.objects.create(
+            title="New Container",
+            container_type="Project",
+            para_category="Projects"
+        )
+        if parent_type == 'container' and parent_id:
+            parent_container = get_object_or_404(WorkspaceContainer, id=parent_id)
+            container.parent = parent_container
+            # Inherit domain
+            container.domain = parent_container.domain
+            container.save()
+            
+        return render(request, 'partials/grid_row.html', {
+            'child': container,
+            'is_container': True,
+            'depth': child_depth if parent_type != 'root' else 0,
+            'all_domains': all_domains,
+            'all_containers': all_containers,
+            'all_tags': Tag.objects.all().order_by('name'),
+        })
+        
+    else: # ExecutionItem
+        item = ExecutionItem.objects.create(
+            title="New Task",
+            item_type="Task",
+            status="Inbox"
+        )
+        if parent_type == 'container' and parent_id:
+            container_ct = ContentType.objects.get_for_model(WorkspaceContainer)
+            item.content_type = container_ct
+            item.object_id = parent_id
+            # Inherit domain
+            parent_container = get_object_or_404(WorkspaceContainer, id=parent_id)
+            item.domain = parent_container.domain
+            item.save()
+        elif parent_type == 'task' and parent_id:
+            task_ct = ContentType.objects.get_for_model(ExecutionItem)
+            item.content_type = task_ct
+            item.object_id = parent_id
+            # Inherit domain
+            parent_task = get_object_or_404(ExecutionItem, id=parent_id)
+            item.domain = parent_task.domain
+            item.save()
+            
+        return render(request, 'partials/grid_row.html', {
+            'item': item,
+            'is_container': False,
+            'depth': child_depth if parent_type != 'root' else 0,
+            'all_domains': all_domains,
+            'all_containers': all_containers,
+            'all_tags': Tag.objects.all().order_by('name'),
+        })
+
+
+@login_required
+@require_POST
+def explorer_grid_create_tag_view(request):
+    """
+    Creates a new Tag on the fly, assigns it to the specified item/container,
+    and returns the re-rendered row HTML.
+    """
+    model_type = request.POST.get('model_type')
+    model_id = request.POST.get('model_id')
+    tag_name = request.POST.get('tag_name', '').strip()
+    
+    if not model_type or not model_id or not tag_name:
+        return HttpResponse("Missing fields", status=400)
+        
+    # Generate random color for new tags
+    import random
+    colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF3', '#FFA833', '#9966CC', '#50C878', '#0F52BA']
+    color = random.choice(colors)
+    
+    tag, created = Tag.objects.get_or_create(name=tag_name, defaults={'color': color})
+    
+    if model_type == 'container':
+        obj = get_object_or_404(WorkspaceContainer, id=model_id)
+        is_container = True
+    else:
+        obj = get_object_or_404(ExecutionItem, id=model_id)
+        is_container = False
+        
+    # Assign the tag to the object
+    obj.tags.add(tag)
+    
+    all_domains = DomainCategory.objects.all().order_by('name')
+    all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+    all_tags = Tag.objects.all().order_by('name')
+    
+    depth = int(request.POST.get('depth', '0'))
+    
+    context = {
+        'all_domains': all_domains,
+        'all_containers': all_containers,
+        'all_tags': all_tags,
+        'depth': depth,
+    }
+    if is_container:
+        context['child'] = obj
+        context['is_container'] = True
+    else:
+        context['item'] = obj
+        context['is_container'] = False
+        
+    # We want to open the dropdown again on load, so we pass a context variable
+    context['open_tag_dropdown'] = True
+    
+    return render(request, 'partials/grid_row.html', context)

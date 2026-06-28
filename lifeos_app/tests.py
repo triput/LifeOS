@@ -861,3 +861,117 @@ class V5FeatureTests(TestCase):
         # Verify database is intact (orphan_container parent is still None)
         self.orphan_container.refresh_from_db()
         self.assertIsNone(self.orphan_container.parent)
+
+
+class LifeOSGridEditorTestCase(TestCase):
+    """
+    Verifies the Hierarchical Backlog Grid Editor endpoints (V5.1).
+    """
+    def setUp(self):
+        self.owner = User.objects.create_superuser(
+            username='owner_trish',
+            password='StrongSecurePassword123!',
+            email='trish@lifeos.lan'
+        )
+        self.client = Client()
+        self.client.login(username='owner_trish', password='StrongSecurePassword123!')
+        
+        self.domain = DomainCategory.objects.get_or_create(name="Engineering")[0]
+        
+        self.container = WorkspaceContainer.objects.create(
+            title="Grid Project",
+            container_type="Project",
+            domain=self.domain
+        )
+        self.task = ExecutionItem.objects.create(
+            title="Grid Task",
+            item_type="Task",
+            status="Planned",
+            domain=self.domain
+        )
+
+    def test_grid_editor_views_require_login(self):
+        # Logout first
+        self.client.logout()
+        response = self.client.get(reverse('explorer-grid'))
+        self.assertRedirects(response, reverse('login'))
+
+    def test_grid_editor_view_success(self):
+        response = self.client.get(reverse('explorer-grid'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Grid Project")
+        self.assertContains(response, "Grid Task")
+
+    def test_grid_editor_save_field_container(self):
+        response = self.client.post(reverse('explorer-grid-save-field'), {
+            'model_type': 'container',
+            'model_id': self.container.id,
+            'field': 'title',
+            'value': 'Updated Grid Project Title'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.container.refresh_from_db()
+        self.assertEqual(self.container.title, 'Updated Grid Project Title')
+
+    def test_grid_editor_save_field_item(self):
+        response = self.client.post(reverse('explorer-grid-save-field'), {
+            'model_type': 'item',
+            'model_id': self.task.id,
+            'field': 'priority',
+            'value': 'Critical'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.priority, 'Critical')
+
+    def test_grid_editor_add_row_container(self):
+        response = self.client.post(reverse('explorer-grid-add-row'), {
+            'parent_type': 'container',
+            'parent_id': self.container.id,
+            'row_type': 'WorkspaceContainer',
+            'depth': '1'
+        })
+        self.assertEqual(response.status_code, 200)
+        # Verify a new container is created in the database and linked to the parent
+        new_container = WorkspaceContainer.objects.get(title="New Container", parent=self.container)
+        self.assertEqual(new_container.domain, self.domain)
+
+    def test_grid_editor_add_row_task(self):
+        response = self.client.post(reverse('explorer-grid-add-row'), {
+            'parent_type': 'container',
+            'parent_id': self.container.id,
+            'row_type': 'Task',
+            'depth': '1'
+        })
+        self.assertEqual(response.status_code, 200)
+        # Verify a new task is created and linked
+        new_task = ExecutionItem.objects.get(title="New Task", object_id=self.container.id)
+        self.assertEqual(new_task.domain, self.domain)
+
+    def test_grid_editor_save_tags(self):
+        tag1 = Tag.objects.create(name="Tag 1", color="#FF0000")
+        tag2 = Tag.objects.create(name="Tag 2", color="#00FF00")
+        
+        response = self.client.post(reverse('explorer-grid-save-field'), {
+            'model_type': 'item',
+            'model_id': self.task.id,
+            'field': 'tags',
+            'value': [tag1.id, tag2.id]
+        })
+        self.assertEqual(response.status_code, 200)
+        self.task.refresh_from_db()
+        self.assertIn(tag1, self.task.tags.all())
+        self.assertIn(tag2, self.task.tags.all())
+
+    def test_grid_editor_create_tag(self):
+        response = self.client.post(reverse('explorer-grid-create-tag'), {
+            'model_type': 'item',
+            'model_id': self.task.id,
+            'tag_name': 'Brand New Tag',
+            'depth': '0'
+        })
+        self.assertEqual(response.status_code, 200)
+        # Verify tag exists and is assigned
+        tag = Tag.objects.get(name="Brand New Tag")
+        self.task.refresh_from_db()
+        self.assertIn(tag, self.task.tags.all())

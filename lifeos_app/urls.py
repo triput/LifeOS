@@ -39,6 +39,14 @@ urlpatterns = [
     path('explorer/move/', views.explorer_move_view, name='explorer-move'),
     path('explorer/edit/<str:node_type>/<int:node_id>/', views.explorer_edit_view, name='explorer-edit'),
     path('explorer/bulk-action/', views.explorer_bulk_action_view, name='explorer-bulk-action'),
+    
+    # V5.1 Backlog Grid Editor Routes
+    path('explorer/grid/', views.explorer_grid_view, name='explorer-grid'),
+    path('explorer/grid/children/', views.explorer_grid_children_view, name='explorer-grid-children'),
+    path('explorer/grid/save-field/', views.explorer_grid_save_field_view, name='explorer-grid-save-field'),
+    path('explorer/grid/add-row/', views.explorer_grid_add_row_view, name='explorer-grid-add-row'),
+    path('explorer/grid/create-tag/', views.explorer_grid_create_tag_view, name='explorer-grid-create-tag'),
+    
     path('analytics/', views.analytics_view, name='analytics'),
     path('analytics/drilldown/', views.analytics_drilldown_view, name='analytics-drilldown'),
     path('toggle-pin/<int:item_id>/', views.toggle_pin_view, name='toggle-pin'),

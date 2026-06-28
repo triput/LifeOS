@@ -1,14 +1,14 @@
 <!--
 # ==============================================================================
 # File: USER_GUIDE.md
-# Description: User guide explaining application startup, settings, layouts, and V5.0 features
+# Description: User guide explaining application startup, settings, layouts, and V5.1 features
 # Component: Documentation
-# Version: 5.0 (Gold Master)
+# Version: 5.1 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-27
+# Last Update: 2026-06-28
 # ==============================================================================
 -->
-# LifeOS Django: User Guide (V5.0)
+# LifeOS Django: User Guide (V5.1)
 
 Welcome to **LifeOS Django V5.0**—a stability-first personal operating system built around a unified DRY data model. This guide outlines how to start, navigate, configure, and utilize the application's core systems.
 
@@ -114,3 +114,17 @@ The Settings panel (`/settings/`) allows you to tune system parameters:
     > Changing the database URL string rewrites the local `.env` environment file. A warning banner will display on screen; you must restart the Django server application to load the new database connections.
 *   **IANA Timezones**: A searchable dropdown list for setting timezones, with auto-detection.
 *   **Domain Manager**: Create, rename, or delete life domains, toggle their custom colors/icons, or mark them as "Academy" domains to aggregate learning metrics separately.
+
+---
+
+## 8. Hierarchical Backlog Grid Editor (V5.1)
+
+The **Backlog Grid Editor** (`/explorer/grid/`) provides a spreadsheet-like grid view of your entire backlog hierarchy (Containers and Tasks), offering maximum speed when editing and organizing.
+
+### Features
+*   **Windows Explorer-Style Folding**: Toggle parent nodes (folders/tasks) to expand or collapse child components, reducing visual clutter. Sub-rows lazy-load once from the server upon initial expansion and remain cached client-side for latency-free folding.
+*   **Inline Auto-Saving**: Simply edit any field—such as changing a task's title, choosing its priority level, updating its status, selecting a domain, or selecting start/due dates. The changes are sent to the server and auto-saved in the background, showing a brief green highlight flash upon completion.
+*   **Checkboxed Tag Dropdown**: Clicking the "Tags" column opens an interactive popover showing all available tags with checkboxes. Checking or unchecking elements updates the item's tags instantly. You can also create a new tag on the fly using the quick creator text field inside the dropdown, which assigns the new tag directly to the row.
+*   **Inline Hierarchical Creation**: Add child containers or nested tasks underneath parent rows instantly with inline `+` buttons. The newly created rows appear recursively indented beneath their parent, inheriting the parent's domain classification automatically.
+*   **Grid Actions**: Delete containers or tasks instantly from the row action controls.
+
